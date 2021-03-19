@@ -2,7 +2,6 @@ import esper
 from time import sleep
 import socketio
 import numpy as np
-import tcod
 import random
 
 import Components as c
