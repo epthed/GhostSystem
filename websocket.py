@@ -1,4 +1,5 @@
 from sanic import Sanic
+from sanic.response import redirect
 import asyncio
 import socketio
 import os
@@ -13,6 +14,11 @@ print("Async server started, accepting connections from", os.environ.get('ORIGIN
 goFast = Sanic(name="GhostSystem Local")
 sio.attach(goFast)
 game = Game()
+
+
+@goFast.get('/')
+async def handler(request):
+    return redirect("https://ghostsystem-web.herokuapp.com/")
 
 
 @goFast.listener('before_server_start')
