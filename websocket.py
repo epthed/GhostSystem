@@ -9,6 +9,7 @@ from game_root import Game
 sio = socketio.asyncio_server.AsyncServer(async_mode='sanic', cors_allowed_origins=os.environ.get('ORIGINS'),
                                           logger=True,
                                           engineio_logger=True)  # ,client_manager=mgr)
+print("Async server started, accepting connections from", os.environ.get('ORIGINS'), "on port", os.environ.get('PORT'))
 goFast = Sanic(name="GhostSystem Local")
 sio.attach(goFast)
 game = Game()
