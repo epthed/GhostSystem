@@ -6,8 +6,9 @@ import os
 from game_root import Game
 
 # mgr = socketio.AsyncRedisManager('redis://')
-sio = socketio.AsyncServer(async_mode='sanic', cors_allowed_origins=os.environ.get('ORIGINS'), logger=True,
-                           engineio_logger=True)  # ,client_manager=mgr)
+sio = socketio.asyncio_server.AsyncServer(async_mode='sanic', cors_allowed_origins=os.environ.get('ORIGINS'),
+                                          logger=True,
+                                          engineio_logger=True)  # ,client_manager=mgr)
 goFast = Sanic(name="GhostSystem Local")
 sio.attach(goFast)
 game = Game()
