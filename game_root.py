@@ -36,7 +36,7 @@ class Game:
             await sio.sleep(1)  # try to run at a 10 tickrate? Maybe? Gives the main thread 10 chances per second to do
             # network IO stuff
 
-            print("world tick")
+            # print("world tick")
 
     def new_character(self, sid, message):
         game_root = globals()
