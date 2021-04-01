@@ -16,6 +16,9 @@ sio.attach(goFast)
 game = Game()
 
 
+# todo graceful handling of sigterm
+
+
 @goFast.get('/')
 async def handler(request):
     return redirect("https://ghostsystem-web.herokuapp.com/")

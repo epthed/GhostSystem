@@ -8,7 +8,7 @@ import websocket
 
 
 def main() -> None:
-    websocket.goFast.run(host='0.0.0.0', port=os.environ.get('PORT'))  # set your local dev environment
+    websocket.goFast.run(host='0.0.0.0', port=os.environ.get('PORT'))  # set your local dev environment var PORT
 
 
 if __name__ == "__main__":

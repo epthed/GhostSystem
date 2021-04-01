@@ -23,7 +23,7 @@ class Game:
         self.world.add_component(player,
                                  c.Renderable())  # always invoke component adds with () even if no constructor argument
         self.world.add_processor(Processors.MovementProcessor())
-        # map = self.create_test_map()
+        map = self.create_test_map()
 
         for n in range(1):
             self.world.create_entity(c.Position(x=n, y=n), c.Velocity(x=1, y=1))
@@ -32,14 +32,13 @@ class Game:
         print(self.world.has_component(player, c.Position))
 
         while True:
-            self.world.process(sio)
+            self.world.process()
             await sio.sleep(1)  # try to run at a 10 tickrate? Maybe? Gives the main thread 10 chances per second to do
             # network IO stuff
 
             # print("world tick")
 
     def new_character(self, sid, message):
-        game_root = globals()
         self.world.create_entity(c.SessionId(sid=sid), c.Position(), c.Velocity(), c.Renderable(),
                                  c.Person(name=message))
 
