@@ -1,5 +1,5 @@
 # when you update the packages: conda env export > environment.yml
-# check package disk usage in heroku: du -BM -s ./pkgs/* | sort -nr
+# check package disk usage in heroku: du -BM -s ./.conda/pkgs/*  | sort -n
 import esper
 from time import sleep
 import os
