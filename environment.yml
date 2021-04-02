@@ -10,4 +10,3 @@ dependencies:
   - sanic
   - pip:
       - esper==1.3
-prefix: /home/thorbinator/miniconda3/envs/ghostsystem
