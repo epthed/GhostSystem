@@ -1,3 +1,4 @@
+# when you update the packages: conda env export > environment.yml
 import esper
 from time import sleep
 import os
@@ -15,4 +16,4 @@ if __name__ == "__main__":
     main()
 
     # performance note: could run 100 entities 10,000 times in 1 second. Ran 1,000,000 ents 1 time in 2 seconds
-    # on MovementProcessor only
+    # on MovementProcessor only, before numba integration

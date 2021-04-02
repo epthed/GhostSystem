@@ -10,6 +10,9 @@ import websocket
 import gs_map
 
 
+# todo install heroku CLI
+# todo change to conda environment from pyenv. then change buildrunner in heroku
+
 class Game:
 
     def __init__(self):
