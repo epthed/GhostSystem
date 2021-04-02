@@ -36,7 +36,7 @@ dependencies:
   - numpy=1.20.2=py38h9894fe3_0
   - openssl=1.1.1k=h7f98852_0
   - pip=21.0.1=pyhd8ed1ab_0
-  - python=3.8.5=h7579374_1
+  - python=3.8.8=hffdb5ce_0_cpython
   - python-engineio=4.0.1=pyhd8ed1ab_0
   - python-socketio=5.1.0=pyhd8ed1ab_0
   - python_abi=3.8=1_cp38
