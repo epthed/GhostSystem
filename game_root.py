@@ -30,10 +30,16 @@ class Game:
                             "username varchar UNIQUE,"
                             "password bytea,"
                             "email bytea,"
-                            "salt bytea"
+                            "salt bytea,"
+                            "is_admin bool"
                             ");")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS mapdata (id serial PRIMARY KEY,"
                             "map json"  # stores json blob/string, will be a 3d numpy array
+                            ");")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS characters (id serial PRIMARY KEY,"
+                            "username varchar,"  # this username can run this character
+                            "charname varchar UNIQUE,"
+                            "char_data json"  # stores json blob/string, will be lots of stuff
                             ");")
         self.conn.commit()
 
@@ -52,7 +58,8 @@ class Game:
         # test = self.cursor.fetchall()
         # self.conn.commit()
         # self.map._testmap()
-        self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com'})
+        self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com',
+                              'admin': False})  # in prod I'll manually set admin users with db runs
 
         for n in range(1):
             self.world.create_entity(c.Position(x=n, y=n), c.Velocity(x=1, y=1))
@@ -78,8 +85,8 @@ class Game:
         hashed_email = hashlib.pbkdf2_hmac('sha512', password=message['email'].encode('utf-8'),
                                            salt=salt, iterations=1000)
         try:
-            self.cursor.execute("INSERT INTO users (username, password, email, salt) VALUES (%s, %s, %s, %s)",
-                                (message['username'], hashed_pw, hashed_email, salt))
+            self.cursor.execute("INSERT INTO users (username, password, email, salt, is_admin) VALUES (%s,%s,%s,%s,%s)",
+                                (message['username'], hashed_pw, hashed_email, salt, False))
         except psycopg2.errors.UniqueViolation:
             return False
         self.conn.commit()
