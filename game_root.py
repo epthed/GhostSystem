@@ -3,6 +3,9 @@ from time import sleep
 import socketio
 import numpy as np
 import random
+import os
+import psycopg2
+import hashlib
 
 import Components as c
 import Processors
@@ -16,7 +19,23 @@ import gs_map
 class Game:
 
     def __init__(self):
+        DATABASE_URL = os.environ['DATABASE_URL']
+        conn = psycopg2.connect(DATABASE_URL)
         self.world = esper.World()
+        self.map = gs_map.Map()
+        self.conn: psycopg2.connect() = conn
+        self.cursor = conn.cursor()
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS test (id serial PRIMARY KEY, num integer, data varchar);")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS users (id serial PRIMARY KEY,"
+                            "username varchar UNIQUE,"
+                            "password varchar,"
+                            "email varchar,"
+                            "salt varchar"
+                            ");")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS mapdata (id serial PRIMARY KEY,"
+                            "map json"  # stores json blob/string, will be a 3d numpy array
+                            ");")
+        self.conn.commit()
 
     async def game_loop(self, sio, sanic, loop):
 
@@ -26,7 +45,14 @@ class Game:
         self.world.add_component(player,
                                  c.Renderable())  # always invoke component adds with () even if no constructor argument
         self.world.add_processor(Processors.MovementProcessor())
-        map = self.create_test_map()
+
+        # self.cursor.execute("INSERT INTO test (num, data) VALUES (%s, %s)", (100, "abc'def"))
+        # self.cursor.execute("SELECT * FROM test;")
+        #
+        # test = self.cursor.fetchall()
+        # self.conn.commit()
+        # self.map._testmap()
+        self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com'})
 
         for n in range(1):
             self.world.create_entity(c.Position(x=n, y=n), c.Velocity(x=1, y=1))
@@ -45,17 +71,19 @@ class Game:
         self.world.create_entity(c.SessionId(sid=sid), c.Position(), c.Velocity(), c.Renderable(),
                                  c.Person(name=message))
 
-    def create_test_map(self):
-        # only display thin walls at render time. Keep memory Map as expanded.
-        # Only even/even tiles are the "real" tiles, others are representative of walls/corners
-        # from this map object we derive the tcod concepts of fov_map and navigation map
+    def register(self, sid, message):
+        salt = os.urandom(16)
+        hashed_pw = hashlib.pbkdf2_hmac('sha512', password=message['password'].encode('utf-8'),
+                                        salt=salt, iterations=1000)
+        hashed_email = hashlib.pbkdf2_hmac('sha512', password=message['email'].encode('utf-8'),
+                                           salt=salt, iterations=1000)
+        try:
+            self.cursor.execute("INSERT INTO users (username, password, email, salt) VALUES (%s, %s, %s, %s)",
+                                (message['username'], hashed_pw, hashed_email, salt))
+        except psycopg2.errors.UniqueViolation:
+            return False
+        self.conn.commit()
+        return True
 
-        map = [[[gs_map.Tile() for col in range(10)] for col in range(10)] for row in
-               range(2)]  # y, x, z? 0,0 is top left
-        for zSlice in map:  # z iteration, outside in
-            for idx, xSlice in enumerate(zSlice):
-                for idy, cell in enumerate(xSlice):
-                    if idx % 2 == 0 and idy % 2 == 0:
-                        cell.spatial = True
-        print(map)
-        return map
+    def authenticate(self, sid, message):
+        return True

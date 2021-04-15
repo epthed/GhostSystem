@@ -88,3 +88,22 @@ async def new_character(sid, message):
     game.new_character(sid, message)
     await sio.emit('new_character', {'message': "Character " + message + " was created", 'characterName': message},
                    room=sid)
+
+
+@sio.event
+async def register(sid, message):
+    success = game.register(sid, message)
+    if success:
+        await sio.emit('register', {'message': "User " + message + " was created", 'success': success}, room=sid)
+    else:
+        await sio.emit('register', {'message': "Registration Failed", 'success': success}, room=sid)
+
+
+@sio.event
+async def authenticate(sid, message):
+    success = game.authenticate(sid, message)
+    if success:
+        await sio.emit('authenticate', {'message': "User " + message.username + " was created", 'success': success},
+                       room=sid)
+    else:
+        await sio.emit('authenticate', {'message': "Authentication Failed", 'success': success}, room=sid)
