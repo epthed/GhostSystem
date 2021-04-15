@@ -28,9 +28,9 @@ class Game:
         self.cursor.execute("CREATE TABLE IF NOT EXISTS test (id serial PRIMARY KEY, num integer, data varchar);")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS users (id serial PRIMARY KEY,"
                             "username varchar UNIQUE,"
-                            "password varchar,"
-                            "email varchar,"
-                            "salt varchar"
+                            "password bytea,"
+                            "email bytea,"
+                            "salt bytea"
                             ");")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS mapdata (id serial PRIMARY KEY,"
                             "map json"  # stores json blob/string, will be a 3d numpy array
