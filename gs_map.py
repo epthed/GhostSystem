@@ -2,6 +2,7 @@ import numpy as np
 import json
 from json import JSONEncoder
 
+from materials import Materials
 
 class MyEncoder(JSONEncoder):
     def default(self, o):
@@ -20,30 +21,17 @@ class Slab:
 
 
 class Tile:
-    def __init__(self, opaque=False, blocking=False, structure=0, west=Slab(), north=Slab(),
-                 floor=Slab(opaque=True, blocking=True), fluid="air", binarymaskarray=0):
+    def __init__(self, fill=0, west=0, north=0,
+                 floor=0, binarymaskarray=0):
         # define only West North and Floor. Put the rest of the 3d grid together and all 6 sides are covered.
         # split them into a binary representation, bit 1 is WestBlocking, bit 2 is WestTransparent etc. then store the
         # resulting number in a numpy array for fastness in FoV/pathing calculations
-        self.opaque = opaque  # these are only for if the entire 1m volume is opaque/blocking
-        self.blocking = blocking
-        self.structure = structure
-        self.fluid = fluid  # what is filling the tile. Water, air, smoke, plasma? string for now, will be a class
-        if type(west) == dict:  # this is to convert dicts to Slabs when loading from JSON
-            west = Slab(**west)
-            north = Slab(**north)
-            floor = Slab(**floor)
+        self.fill = fill  # these are only for if the entire 1m volume is opaque/blocking
         self.west = west
         self.north = north
         self.floor = floor
         self.binarymaskarray = binarymaskarray
         self.calc_binarymaskarray()
-
-    def __str__(self):  # the standard print
-        return str(self.fluid)
-
-    def __repr__(self):  # the debug print
-        return str(self.fluid)
 
     def mask(self):
         return self.binarymaskarray
@@ -71,15 +59,20 @@ class Tile:
 
 
 class Map:
-    def __init__(self, y=100, x=100, z=30):
+    def __init__(self, y=100, x=100, z=30, conn=None, cursor=None):
         # self._objectarray = [[[Tile() for _x in range(x)] for _y in range(y)] for _z in range(z)]
         #               x                                       y                       z
         # address by z,y,x 0,0,0 is bottom height, west, and north
         # https://stackoverflow.com/a/15311166
         # self._calculate_numpy()
-        self.districts = np.arange(100).reshape(10, -1)
-        self.nparray = np.zeros((z, y, x), dtype=np.uint16)
-        self.nparray[0] = self.nparray[0] + 48
+        self.conn = conn
+        self.cursor = cursor
+        self.districts_grid = np.arange(100).reshape(10, -1)  # 20 megs when exported
+        self.districts = []
+        for district in range(100):
+            self.districts.append(None)
+        self.nparray = np.zeros((z, y, x), dtype=np.uint32)
+        # self.nparray[0] = self.nparray[0] + 48 todo reinstate this creation of a global floor, the number changed
 
     def _testmap(self):
         # for idz, zSlice in enumerate(self._objectarray):  # z iteration, outside in
@@ -89,9 +82,24 @@ class Map:
         #                 cell.fluid = "test"
         #                 if self._objectarray[idz][idy][idx] == cell:
         #                     pass
-        insert = np.zeros((2, 5, 5), dtype=np.uint16)
+        mats = Materials()
+        for district in range(100):
+            self.districts[district] = self.get_district(district)
+        insert = np.zeros((2, 5, 5), dtype=np.uint32)
         insert = np.add(insert, 55)
         self.insert(insert, l=(0, 5, 5))
+
+    def get_district(self, district):
+        self.cursor.execute("SELECT map FROM mapdata WHERE id=%s", (district,))
+        try:
+            map_data = self.cursor.fetchone()[0]
+            map_data = np.array(map_data)
+        except TypeError:
+            map_data = np.zeros((30, 100, 100), dtype=np.uint32)
+            insert_object = json.dumps(map_data.tolist())
+            self.cursor.execute("INSERT INTO mapdata (id, map) VALUES (%s, %s)", (district, insert_object))
+            self.conn.commit()
+        return map_data
 
     def _calculate_numpy(self):
         self.nparray = np.array([[[x.mask() for x in y] for y in z] for z in self._objectarray],

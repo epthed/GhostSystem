@@ -103,7 +103,7 @@ async def register(sid, message):
 async def authenticate(sid, message):
     success = game.authenticate(sid, message)
     if success:
-        await sio.emit('authenticate', {'message': "User " + message.username + " was created", 'success': success},
+        await sio.emit('authenticate', {'message': "Welcome back " + message.username + ".", 'success': success},
                        room=sid)
     else:
         await sio.emit('authenticate', {'message': "Authentication Failed", 'success': success}, room=sid)

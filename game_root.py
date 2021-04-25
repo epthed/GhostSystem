@@ -22,9 +22,10 @@ class Game:
         DATABASE_URL = os.environ['DATABASE_URL']
         conn = psycopg2.connect(DATABASE_URL)
         self.world = esper.World()
-        self.map = gs_map.Map()
+
         self.conn: psycopg2.connect() = conn
         self.cursor = conn.cursor()
+        self.map = gs_map.Map(conn=self.conn, cursor=self.cursor)
         self.cursor.execute("CREATE TABLE IF NOT EXISTS test (id serial PRIMARY KEY, num integer, data varchar);")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS users (id serial PRIMARY KEY,"
                             "username varchar UNIQUE,"
@@ -60,6 +61,7 @@ class Game:
         # self.map._testmap()
         self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com',
                               'admin': False})  # in prod I'll manually set admin users with db runs
+        self.authenticate(3000, {'username': 'epthed_test', 'password': 'password'})
 
         for n in range(1):
             self.world.create_entity(c.Position(x=n, y=n), c.Velocity(x=1, y=1))
