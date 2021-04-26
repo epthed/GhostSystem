@@ -1,8 +1,10 @@
 import numpy as np
 import json
 from json import JSONEncoder
+from bitarray import bitarray, util
 
 from materials import Materials
+
 
 class MyEncoder(JSONEncoder):
     def default(self, o):
@@ -21,32 +23,53 @@ class Slab:
 
 
 class Tile:
+
     def __init__(self, fill=0, west=0, north=0,
-                 floor=0, binarymaskarray=0):
+                 floor=0, binaryarray=0):
         # define only West North and Floor. Put the rest of the 3d grid together and all 6 sides are covered.
         # split them into a binary representation, bit 1 is WestBlocking, bit 2 is WestTransparent etc. then store the
         # resulting number in a numpy array for fastness in FoV/pathing calculations
-        self.fill = fill  # these are only for if the entire 1m volume is opaque/blocking
-        self.west = west
-        self.north = north
-        self.floor = floor
-        self.binarymaskarray = binarymaskarray
-        self.calc_binarymaskarray()
+        self.fill = util.int2ba(fill, 7)
+        self.west = util.int2ba(west, 7)
+        self.north = util.int2ba(north, 7)
+        self.floor = util.int2ba(floor, 7)
+        self.mats = Materials()
 
-    def mask(self):
-        return self.binarymaskarray
+        if binaryarray != 0:  # if we're creating object from a passed in full tile int
+            self.binaryarray = util.int2ba(binaryarray, 32)
+            self.load_binaryarray()
+        else:
+            self.binaryarray = util.int2ba(binaryarray, 32)
+            self.calc_binaryarray()
 
-    def calc_binarymaskarray(self):
-        output = 0
-        if self.west.opaque: output += 2 ** 0
-        if self.west.blocking: output += 2 ** 1
-        if self.north.opaque: output += 2 ** 2
-        if self.north.blocking: output += 2 ** 3
-        if self.floor.opaque: output += 2 ** 4
-        if self.floor.blocking: output += 2 ** 5
-        if self.opaque: output += 2 ** 6
-        if self.blocking: output += 2 ** 7
-        self.binarymaskarray = output
+    def get_int(self):
+        return util.ba2int(self.binaryarray)
+
+    def load_binaryarray(self):
+        self.fill = self.binaryarray[0:7]
+        self.west = self.binaryarray[7:14]
+        self.north = self.binaryarray[14:21]
+        self.floor = self.binaryarray[21:28]
+
+    def calc_binaryarray(self):
+        self.binaryarray[0:7] = self.fill
+        self.binaryarray[7:14] = self.west
+        self.binaryarray[14:21] = self.north
+        self.binaryarray[21:28] = self.floor
+
+    def walkable(self):
+        fill = self.mats.mat[util.ba2int(self.fill)]
+        west = self.mats.mat[util.ba2int(self.west)]
+        north = self.mats.mat[util.ba2int(self.north)]
+        floor = self.mats.mat[util.ba2int(self.floor)]
+        return not fill['blocking'], not west['blocking'], not north['blocking'], not floor['blocking']
+
+    def transparent(self):
+        fill = self.mats.mat[util.ba2int(self.fill)]
+        west = self.mats.mat[util.ba2int(self.west)]
+        north = self.mats.mat[util.ba2int(self.north)]
+        floor = self.mats.mat[util.ba2int(self.floor)]
+        return not fill['opaque'], not west['opaque'], not north['opaque'], not floor['opaque']
 
 
 # save and load an individual tile
@@ -72,7 +95,7 @@ class Map:
         for district in range(100):
             self.districts.append(None)
         self.nparray = np.zeros((z, y, x), dtype=np.uint32)
-        # self.nparray[0] = self.nparray[0] + 48 todo reinstate this creation of a global floor, the number changed
+        self.nparray[0] = self.nparray[0] + 48  # 48 is concrete/3 floor with nothing else
 
     def _testmap(self):
         # for idz, zSlice in enumerate(self._objectarray):  # z iteration, outside in
@@ -83,6 +106,10 @@ class Map:
         #                 if self._objectarray[idz][idy][idx] == cell:
         #                     pass
         mats = Materials()
+        example_tile = Tile(floor=3, fill=2)
+        debug_floor_number = example_tile.get_int()
+        walkable = example_tile.walkable()
+        seethrough = Tile(binaryarray=48).transparent()
         for district in range(100):
             self.districts[district] = self.get_district(district)
         insert = np.zeros((2, 5, 5), dtype=np.uint32)

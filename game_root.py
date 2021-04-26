@@ -58,7 +58,8 @@ class Game:
         #
         # test = self.cursor.fetchall()
         # self.conn.commit()
-        # self.map._testmap()
+        if os.environ['DATABASE_URL'].__contains__("localhost"):
+            self.map._testmap()
         self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com',
                               'admin': False})  # in prod I'll manually set admin users with db runs
         self.authenticate(3000, {'username': 'epthed_test', 'password': 'password'})

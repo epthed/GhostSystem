@@ -8,6 +8,7 @@ dependencies:
   - python=3.8.*
   - python-socketio
   - sanic
+  - bitarray
   - pip:
       - esper==1.3
       - psycopg2-binary
