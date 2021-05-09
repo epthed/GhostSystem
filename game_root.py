@@ -11,38 +11,35 @@ import Components as c
 import Processors
 import websocket
 import gs_map
+import globalvar
 
 
 # todo install heroku CLI
-# todo change to conda environment from pyenv. then change buildrunner in heroku
 
 class Game:
 
     def __init__(self):
-        DATABASE_URL = os.environ['DATABASE_URL']
-        conn = psycopg2.connect(DATABASE_URL)
+
         self.world = esper.World()
 
-        self.conn: psycopg2.connect() = conn
-        self.cursor = conn.cursor()
-        self.map = gs_map.Map(conn=self.conn, cursor=self.cursor)
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS test (id serial PRIMARY KEY, num integer, data varchar);")
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS users (id serial PRIMARY KEY,"
-                            "username varchar UNIQUE,"
-                            "password bytea,"
-                            "email bytea,"
-                            "salt bytea,"
-                            "is_admin bool"
-                            ");")
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS mapdata (id serial PRIMARY KEY,"
-                            "map json"  # stores json blob/string, will be a 3d numpy array
-                            ");")
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS characters (id serial PRIMARY KEY,"
-                            "username varchar,"  # this username can run this character
-                            "charname varchar UNIQUE,"
-                            "char_data json"  # stores json blob/string, will be lots of stuff
-                            ");")
-        self.conn.commit()
+        self.map = gs_map.MapManager()
+        globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS test (id serial PRIMARY KEY, num integer, data varchar);")
+        globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS users (id serial PRIMARY KEY,"
+                                 "username varchar UNIQUE,"
+                                 "password bytea,"
+                                 "email bytea,"
+                                 "salt bytea,"
+                                 "is_admin bool"
+                                 ");")
+        globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS mapdata (id serial PRIMARY KEY,"
+                                 "map json"  # stores json blob/string, will be a 3d numpy array
+                                 ");")
+        globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS characters (id serial PRIMARY KEY,"
+                                 "username varchar,"  # this username can run this character
+                                 "charname varchar UNIQUE,"
+                                 "char_data json"  # stores json blob/string, will be lots of stuff
+                                 ");")
+        globalvar.conn.commit()
 
     async def game_loop(self, sio, sanic, loop):
 
@@ -64,8 +61,9 @@ class Game:
                               'admin': False})  # in prod I'll manually set admin users with db runs
         self.authenticate(3000, {'username': 'epthed_test', 'password': 'password'})
 
-        for n in range(1):
-            self.world.create_entity(c.Position(x=n, y=n), c.Velocity(x=1, y=1))
+        names = ['John', 'Bob', 'Jimbo', 'Brick']
+        for n in range(4):
+            self.world.create_entity(c.Position(x=n, y=0), c.Velocity(x=1, y=1), c.Person(name=names[n]))
 
         print(self.world.components_for_entity(player))
         print(self.world.has_component(player, c.Position))
@@ -88,8 +86,9 @@ class Game:
         hashed_email = hashlib.pbkdf2_hmac('sha512', password=message['email'].encode('utf-8'),
                                            salt=salt, iterations=1000)
         try:
-            self.cursor.execute("INSERT INTO users (username, password, email, salt, is_admin) VALUES (%s,%s,%s,%s,%s)",
-                                (message['username'], hashed_pw, hashed_email, salt, False))
+            globalvar.cursor.execute("INSERT INTO users (username, password, email, salt, is_admin) "
+                                     "VALUES (%s,%s,%s,%s,%s)", (message['username'], hashed_pw, hashed_email, salt,
+                                                                 False))
         except psycopg2.errors.UniqueViolation:
             return False
         self.conn.commit()
