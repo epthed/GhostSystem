@@ -26,11 +26,11 @@ class Slab:
 class Tile:
 
     def __init__(self, fill=0, west=0, north=0,
-                 floor=0, binaryarray=0):
+                 floor=0, binaryarray=None):
         # define only West North and Floor. Put the rest of the 3d grid together and all 6 sides are covered.
         # split them into a binary representation, bit 1 is WestBlocking, bit 2 is WestTransparent etc. then store the
         # resulting number in a numpy array for fastness in FoV/pathing calculations
-        if (fill, west, north, floor) is not (0, 0, 0, 0):
+        if (fill, west, north, floor) != (0, 0, 0, 0):
             slabs = [fill, west, north, floor]
             for i, slab in enumerate(slabs):
                 if type(slab) == str:
@@ -41,11 +41,11 @@ class Tile:
             self.north = util.int2ba(north, 7)
             self.floor = util.int2ba(floor, 7)
 
-        if binaryarray != 0:  # if we're creating object from a passed in full tile int
-            self.binaryarray = util.int2ba(binaryarray, 32)
+        if binaryarray is not None:  # if we're creating object from a passed in full tile int
+            self.binaryarray = util.int2ba(int(binaryarray), 32)
             self.load_binaryarray()
         else:
-            self.binaryarray = util.int2ba(binaryarray, 32)
+            self.binaryarray = util.int2ba(0, 32)
             self.calc_binaryarray()
 
     def get_int(self):
@@ -93,15 +93,6 @@ class MapManager:
         for district in range(100):
             self.districts.append(None)
 
-
-class Map:
-    def __init__(self, y=100, x=100, z=30):
-        # address by z,y,x 0,0,0 is bottom height, west, and north
-        # https://stackoverflow.com/a/15311166
-
-        self.nparray = np.zeros((z, y, x), dtype=np.uint32)
-        self.nparray[0] = self.nparray[0] + 48  # 48 is concrete/3 floor with nothing else. setting
-
     def _testmap(self):
         # for idz, zSlice in enumerate(self._objectarray):  # z iteration, outside in
         #     for idy, ySlice in enumerate(zSlice):
@@ -114,41 +105,66 @@ class Map:
         debug_floor_number = example_tile.get_int()
         walkable = example_tile.walkable()
         seethrough = Tile(binaryarray=48).transparent()
-        for district in range(100):
-            self.districts[district] = get_district(district)
-        insert = np.zeros((2, 5, 5), dtype=np.uint32)
-        insert = np.add(insert, 55)
-        self.insert(insert, self.nparray, l=(0, 5, 5))
+        # for district in range(100):
+        #     self.districts[district] = get_district(district)
+        insert_array = np.zeros((2, 5, 5), dtype=np.uint32)
+        insert_array = np.add(insert_array, 55)
+        test_insertion_target = np.zeros((30, 100, 100), dtype=np.uint32)
+        test_insertion_target = insert(insert_array, test_insertion_target, loc=(0, 5, 5))
+        pass
 
-    def _calculate_numpy(self):
-        self.nparray = np.array([[[x.mask() for x in y] for y in z] for z in self._objectarray],
-                                subok=False, dtype=np.int32)
-        # print(self._objectarray[0][1][1].north.__dict__)
-        # print(self._objectarray[0][1][1].__dict__)
-        # temp = json.dumps(self._objectarray[0][1][1].north, cls=MyEncoder)
-        # temp = json.dumps(self._objectarray[0][1][1], cls=MyEncoder, indent=4)
-        # temp = json.dumps(self._objectarray, cls=MyEncoder)
-        # print(temp)
-        # temp = json.loads(temp)
-        # temp = [[[Tile(**x) for x in y] for y in z] for z in temp]
-        # # temp = Tile(**temp)
-        #
-        # print(self.nparray[0][1][1])  # still addressed with z,y,x
+
+class Map:
+    def __init__(self, y=100, x=100, z=30):
+        # address by z,y,x 0,0,0 is bottom height, west, and north
+        # https://stackoverflow.com/a/15311166
+
+        self.nparray = np.zeros((30, 100, 100), dtype=np.uint32)
+        self.nparray[0] = self.nparray[0] + 48  # 48 is concrete/3 floor with nothing else. setting
+        insert_array = np.zeros((1, 5, 5), dtype=np.uint32)
+        insert_array = np.add(insert_array, 67108912)
+        self.nparray = insert(insert_array, self.nparray, loc=(0, 3, 3))
+
+        self.fov = True  # use setter to force recalculation
 
     @property
     def transparent(self) -> np.ndarray:
-        buffer = self.__buffer[:, :, 0]
-        return buffer.T if self._order == "F" else buffer
+        return self.transparent
 
     @property
     def walkable(self) -> np.ndarray:
-        buffer = self.__buffer[:, :, 1]
-        return buffer.T if self._order == "F" else buffer
+        return self.walkable
 
     @property
     def fov(self) -> np.ndarray:
-        buffer = self.__buffer[:, :, 2]
-        return buffer.T if self._order == "F" else buffer
+        return self.fov
+
+    @fov.setter
+    def fov(self, value):
+        unique_tiles = np.unique(self.nparray)
+        visibility_angles = []
+        for source in unique_tiles:
+            for destination in unique_tiles:
+                source_transparency = Tile(binaryarray=source).transparent()
+                destination_transparency = Tile(binaryarray=destination).transparent()
+                if not source_transparency[0] or not destination_transparency[0]:  # if the source or dest is filled
+                    # with opaque materials then set all direction checks to false
+                    visibility_angles.append([False, False, False, False, False, False, False, False])
+                    continue
+                pass
+
+        # try constructing 2d numpy boolean list of valid visible tile/walls
+        # 1 2 3
+        # 4 s 5    "s" is source tile
+        # 6 7 8
+        # combinatorial: example 0-0, 0-48, 48-0, 48-48 scales with uniques^2
+        # return not fill['opaque'], not west['opaque'], not north['opaque'], not floor['opaque']
+
+    #
+    # @transparent.setter
+    # def transparent(self, recalculate):
+    #
+    #     pass
 
 
 def get_district(district):
@@ -177,3 +193,4 @@ def insert(new_array, insertion_target, loc=(0, 0, 0), ):
     yidx = len(new_array[0])
     xidx = len(new_array[0][0])
     insertion_target[loc[0]:loc[0] + zidx, loc[1]:loc[1] + yidx, loc[2]:loc[2] + xidx] = new_array[:, :, :]
+    return insertion_target

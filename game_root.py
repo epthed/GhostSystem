@@ -44,10 +44,11 @@ class Game:
     async def game_loop(self, sio, sanic, loop):
 
         player = self.world.create_entity()
+        # always invoke component adds with () even if no constructor argument
         self.world.add_component(player, c.Position(x=1, y=2))
         self.world.add_component(player, c.Velocity(x=1, y=-1))
-        self.world.add_component(player,
-                                 c.Renderable())  # always invoke component adds with () even if no constructor argument
+        self.world.add_component(player, c.Renderable())
+        self.world.add_component(player, c.EntityMap())
         self.world.add_processor(Processors.MovementProcessor())
 
         # self.cursor.execute("INSERT INTO test (num, data) VALUES (%s, %s)", (100, "abc'def"))
