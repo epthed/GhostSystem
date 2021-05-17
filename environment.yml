@@ -1,7 +1,7 @@
 name: ghostsystem
 channels:
-  - conda-forge
   - defaults
+  - conda-forge
 dependencies:
   - numba
   - pip
