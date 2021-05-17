@@ -145,18 +145,25 @@ class Map:
         visibility_angles = []
         for source in unique_tiles:
             for destination in unique_tiles:
+                local_valid_paths = []
                 source_transparency = Tile(binaryarray=source).transparent()
                 destination_transparency = Tile(binaryarray=destination).transparent()
                 if not source_transparency[0] or not destination_transparency[0]:  # if the source or dest is filled
                     # with opaque materials then set all direction checks to false
                     visibility_angles.append([False, False, False, False, False, False, False, False])
                     continue
+                # each of the directions in order
+                local_valid_paths.append((source_transparency[1] and source_transparency[2]))  # 0 north or west
+                local_valid_paths.append(source_transparency[2])  # 1 north
+                local_valid_paths.append((destination_transparency[1] and source_transparency[2]))  # 2 north or east
+
+                visibility_angles.append(local_valid_paths)
                 pass
 
         # try constructing 2d numpy boolean list of valid visible tile/walls
-        # 1 2 3
-        # 4 s 5    "s" is source tile
-        # 6 7 8
+        # 0 1 2
+        # 3 s 4    "s" is source tile
+        # 5 6 7
         # combinatorial: example 0-0, 0-48, 48-0, 48-48 scales with uniques^2
         # return not fill['opaque'], not west['opaque'], not north['opaque'], not floor['opaque']
 

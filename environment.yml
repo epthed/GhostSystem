@@ -9,6 +9,7 @@ dependencies:
   - python-socketio
   - sanic
   - bitarray
+  - scikit-geometry
   - pip:
       - esper==1.3
       - psycopg2-binary
