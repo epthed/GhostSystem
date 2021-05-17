@@ -25,6 +25,8 @@ per-actor fov
     easy version: Up and down on Z level until blocked, can't see diagonal. Problem: shooting from balcony
     solution: Drop Z up and downs from adjacent visible squares. 
 
+fix slug size- remove scikit-geometry and use older bindings
+
 #DONE
 Per-actor Map 
 make materials a function not a class
