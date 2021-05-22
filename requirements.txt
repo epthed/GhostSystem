@@ -5,4 +5,4 @@ sanic
 llvmlite
 numba
 psycopg2-binary
--e git+git://github.com/scikit-geometry/scikit-geometry.git
+-e git+git://github.com/scikit-geometry/scikit-geometry.git#egg=skgeom
