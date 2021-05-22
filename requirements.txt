@@ -1,0 +1,8 @@
+esper
+numpy
+bitarray
+sanic
+llvmlite
+numba
+psycopg2-binary
+git+git://github.com/scikit-geometry/scikit-geometry.git

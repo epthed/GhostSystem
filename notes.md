@@ -25,7 +25,10 @@ per-actor fov
     easy version: Up and down on Z level until blocked, can't see diagonal. Problem: shooting from balcony
     solution: Drop Z up and downs from adjacent visible squares. 
 
-fix slug size- remove scikit-geometry and use older bindings
+fix slug size- remove scikit-geometry and use older bindings. Or re-implement locally without matplotlib
+    use scikit-geometry but build it live? https://devcenter.heroku.com/articles/python-pip
+    in requirements.txt: git+git://github.com/scikit-geometry/scikit-geometry.git
+    first: apt buildpack for: llvmlite/numba and CGAL5, boost-cpp and cgal-cpp?. 
 
 #DONE
 Per-actor Map 
