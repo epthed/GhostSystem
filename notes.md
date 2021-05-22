@@ -29,6 +29,10 @@ fix slug size- remove scikit-geometry and use older bindings. Or re-implement lo
     use scikit-geometry but build it live? https://devcenter.heroku.com/articles/python-pip
     in requirements.txt: git+git://github.com/scikit-geometry/scikit-geometry.git
     first: apt buildpack for: llvmlite/numba and CGAL5, boost-cpp and cgal-cpp?. 
+    -e git+git://github.com/scikit-geometry/scikit-geometry.git#egg=skgeom  Running setup.py develop for skgeom
+-----> Timed out running buildpack Python
+    git+git://github.com/scikit-geometry/scikit-geometry.git Building wheel for skgeom (setup.py): finished with status 'error'
+    actual c build errors 
 
 #DONE
 Per-actor Map 
