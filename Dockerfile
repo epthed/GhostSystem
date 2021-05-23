@@ -20,4 +20,4 @@ RUN echo "conda activate ghostsystem" >> ~/.bashrc
 SHELL ["/bin/bash", "--login", "-c"]
 
 COPY . /opt/ghostsystem/
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/opt/ghostsystem/entrypoint.sh"]
