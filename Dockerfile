@@ -17,7 +17,10 @@ RUN wget \
     && conda update conda \
     && conda env create -f environment.yml
 RUN echo "conda activate ghostsystem" >> ~/.bashrc
+RUN chmod -v 775 ./entrypoint.sh
+
 SHELL ["/bin/bash", "--login", "-c"]
 
 COPY . /opt/ghostsystem/
+RUN chmod 775 ./*
 ENTRYPOINT ["./entrypoint.sh"]
