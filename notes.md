@@ -33,6 +33,8 @@ fix slug size- remove scikit-geometry and use older bindings. Or re-implement lo
 -----> Timed out running buildpack Python
     git+git://github.com/scikit-geometry/scikit-geometry.git Building wheel for skgeom (setup.py): finished with status 'error'
     actual c build errors 
+    conda too big even after clearing cache
+    Final plan: Use docker container to deploy conda-built https://devcenter.heroku.com/articles/container-registry-and-runtime
 
 #DONE
 Per-actor Map 
