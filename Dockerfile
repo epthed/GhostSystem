@@ -1,7 +1,7 @@
 FROM heroku/heroku:20
 
 # Add our code
-COPY environment.yml entrypoint.sh /opt/ghostsystem/
+COPY environment.yml /opt/ghostsystem/
 WORKDIR /opt/ghostsystem
 
 # get miniconda itself
@@ -16,11 +16,9 @@ RUN wget \
     && conda init bash \
     && conda update conda \
     && conda env create -f environment.yml
-RUN echo "conda activate ghostsystem" >> ~/.bashrc
-RUN chmod -v 775 ./entrypoint.sh
 
-SHELL ["/bin/bash", "--login", "-c"]
+SHELL ["conda", "run", "-n", "ghostsystem", "/bin/bash", "-c"]
 
 COPY . /opt/ghostsystem/
 RUN chmod 775 ./*
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "ghostsystem", "python", "main.py"]
