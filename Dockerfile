@@ -1,10 +1,10 @@
 FROM heroku/heroku:20
 
-# Add our code
+# drop just the environment in
 COPY environment.yml /opt/ghostsystem/
 WORKDIR /opt/ghostsystem
 
-# get miniconda itself
+# get miniconda itself, and last line apply our packages
 ENV PATH="/root/miniconda3/bin:${PATH}"
 ARG PATH="/root/miniconda3/bin:${PATH}"
 
@@ -16,9 +16,10 @@ RUN wget \
     && conda init bash \
     && conda update conda \
     && conda env create -f environment.yml
-
+# up until here is 1.7gb, thankfully unfrequently updated
 SHELL ["conda", "run", "-n", "ghostsystem", "/bin/bash", "-c"]
 
+# actually copy the code over
 COPY . /opt/ghostsystem/
 RUN chmod 775 ./*
 ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "ghostsystem", "python", "main.py"]
