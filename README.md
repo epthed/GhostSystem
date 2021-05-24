@@ -6,7 +6,8 @@ Install PostgreSQL that this process can access
 
 Set environment variables, names below are required, fill in values as needed. 
 This assumes running [ghostsystem-web](https://github.com/epthed/GhostSystem-web) locally as well:
-
+```
 PORT=5000;  
 ORIGINS=http://localhost:8080; 
 DATABASE_URL=postgres://postgres@localhost:5432  
+```
