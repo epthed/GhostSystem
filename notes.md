@@ -7,7 +7,7 @@ everything else
 authentication+account creation  
 persist connection/authorization - cookies?  
 figure out global vs per-actor position addressing  
-
+python test suite coverage
 per-actor pathing
 
 my apartment test map
@@ -25,21 +25,11 @@ per-actor fov
     easy version: Up and down on Z level until blocked, can't see diagonal. Problem: shooting from balcony
     solution: Drop Z up and downs from adjacent visible squares. 
 
-fix slug size- remove scikit-geometry and use older bindings. Or re-implement locally without matplotlib
-    use scikit-geometry but build it live? https://devcenter.heroku.com/articles/python-pip
-    in requirements.txt: git+git://github.com/scikit-geometry/scikit-geometry.git
-    first: apt buildpack for: llvmlite/numba and CGAL5, boost-cpp and cgal-cpp?. 
-    -e git+git://github.com/scikit-geometry/scikit-geometry.git#egg=skgeom  Running setup.py develop for skgeom
------> Timed out running buildpack Python
-    git+git://github.com/scikit-geometry/scikit-geometry.git Building wheel for skgeom (setup.py): finished with status 'error'
-    actual c build errors 
-    conda too big even after clearing cache
-    Final plan: Use docker container to deploy conda-built https://devcenter.heroku.com/articles/container-registry-and-runtime
-configure my IDE with sudo heroku container:push web -a ghostsystem-api => heroku container:release -a ghostsystem-api web
 
 
 #DONE
 Per-actor Map 
+fixed deploy issues
 make materials a function not a class
 map representation - use 2^7 bits for the 4 materials
 basic esper ECS implementation  

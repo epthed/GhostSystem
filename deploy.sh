@@ -1,3 +1,3 @@
 #!/bin/bash
-heroku container:push web -a ghostsystem-api
+heroku container:push    -a ghostsystem-api web
 heroku container:release -a ghostsystem-api web
