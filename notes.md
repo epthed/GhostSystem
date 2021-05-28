@@ -15,8 +15,6 @@ my apartment test map
 #IN PROGRESS
 
 per-actor fov  
-    implement as valid tiles are added to list to iterate through, bubble out from start point, plus some check to the 
-    starting position
     https://scikit-geometry.github.io/scikit-geometry/arrangements_visibility.html#Computing-Visibility
     that's for 2d, pretty simple to dump map -> points -> geometry -> FoV in 2d
     my thinking right now is do a multilayer cake, do the 2d calculation at Z=0,1,2,3 etc. Then do a 90 degree rotated 

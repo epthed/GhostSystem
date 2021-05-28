@@ -14,7 +14,6 @@ import gs_map
 import globalvar
 
 
-# todo install heroku CLI
 
 class Game:
 
@@ -92,7 +91,7 @@ class Game:
                                                                  False))
         except psycopg2.errors.UniqueViolation:
             return False
-        self.conn.commit()
+        globalvar.conn.commit()
         return True
 
     def authenticate(self, sid, message):
