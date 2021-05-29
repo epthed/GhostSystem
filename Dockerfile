@@ -21,5 +21,4 @@ SHELL ["conda", "run", "-n", "ghostsystem", "/bin/bash", "-c"]
 
 # actually copy the code over
 COPY . /opt/ghostsystem/
-RUN chmod 775 ./*
 ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "ghostsystem", "python", "main.py"]
