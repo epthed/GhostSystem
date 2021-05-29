@@ -19,8 +19,7 @@ class Slab:
         self.blocking = blocking
         self.structure = structure
 
-    # todo: store everything in a 3d numpy array, fuck object arrays uint32 can store 32 true/false, uint64 etc
-    # make tile/slab just helper functions of getting info from or into a number. tile.east.blocking(number) => bool
+    # make tile/slab just helper functions of getting info from or into a number. Tile(number).east.blocking => bool
 
 
 class Tile:
@@ -93,6 +92,8 @@ class MapManager:
         for district in range(100):
             self.districts.append(None)
 
+    # todo expand for multiple sets of actors. Right now only handles a single actor
+
     def _testmap(self):
         # for idz, zSlice in enumerate(self._objectarray):  # z iteration, outside in
         #     for idy, ySlice in enumerate(zSlice):
@@ -112,6 +113,10 @@ class MapManager:
         test_insertion_target = np.zeros((30, 100, 100), dtype=np.uint32)
         test_insertion_target = insert(insert_array, test_insertion_target, loc=(0, 5, 5))
         pass
+
+    def update_districts(self, list_of_actors=[int]):
+        for district in list_of_actors:
+            self.districts[district] = get_district(district)
 
 
 class Map:
@@ -175,8 +180,9 @@ class Map:
 
 
 def get_district(district):
-    globalvar.cursor.execute("SELECT map FROM mapdata WHERE id=%s", (district,))
+
     try:
+        globalvar.cursor.execute("SELECT map FROM mapdata WHERE id=%s", (district,))
         map_data = globalvar.cursor.fetchone()[0]
         map_data = np.array(map_data)
     except TypeError:
