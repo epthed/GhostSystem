@@ -36,12 +36,12 @@ class UpdateMap:
     pass
 
 class Character:
-    #@njit
+    # stuff that only counts for player characters
     def __init__(self, sid, username):
                 self.sid = sid
                 self.username = username
 
 class Person:
-    #@njit
-    def __init__(self, name):
+    # sentient beings, probably differentiate from robots and ghosts later
+    def __init__(self, name: str):
                 self.name = name

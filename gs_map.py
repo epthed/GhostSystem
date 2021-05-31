@@ -2,6 +2,7 @@ import numpy as np
 import json
 from json import JSONEncoder
 from bitarray import bitarray, util
+from typing import Union
 
 from materials import materials, material_id
 import globalvar
@@ -24,8 +25,8 @@ class Slab:
 
 class Tile:
 
-    def __init__(self, fill=0, west=0, north=0,
-                 floor=0, binaryarray=None):
+    def __init__(self, fill: Union[int, str] = 0, west: Union[int, str] = 0, north: Union[int, str] = 0,
+                 floor: Union[int, str] = 0, binaryarray: int = None):
         # define only West North and Floor. Put the rest of the 3d grid together and all 6 sides are covered.
         # split them into a binary representation, bit 1 is WestBlocking, bit 2 is WestTransparent etc. then store the
         # resulting number in a numpy array for fastness in FoV/pathing calculations
@@ -47,7 +48,7 @@ class Tile:
             self.binaryarray = util.int2ba(0, 32)
             self.calc_binaryarray()
 
-    def get_int(self):
+    def get_int(self) -> int:
         return util.ba2int(self.binaryarray)
 
     def load_binaryarray(self):
@@ -62,14 +63,14 @@ class Tile:
         self.binaryarray[14:21] = self.north
         self.binaryarray[21:28] = self.floor
 
-    def walkable(self):
+    def walkable(self) -> (bool, bool, bool, bool):
         fill = materials(util.ba2int(self.fill))
         west = materials(util.ba2int(self.west))
         north = materials(util.ba2int(self.north))
         floor = materials(util.ba2int(self.floor))
         return not fill['blocking'], not west['blocking'], not north['blocking'], not floor['blocking']
 
-    def transparent(self):
+    def transparent(self) -> (bool, bool, bool, bool):
         fill = materials(util.ba2int(self.fill))
         west = materials(util.ba2int(self.west))
         north = materials(util.ba2int(self.north))
@@ -114,13 +115,37 @@ class MapManager:
         test_insertion_target = insert(insert_array, test_insertion_target, loc=(0, 5, 5))
         pass
 
-    def update_districts(self, list_of_actors=[int]):
-        for district in list_of_actors:
-            self.districts[district] = get_district(district)
+    def update_districts(self, actors_in_districts: dict):
+        # function returns a 3x3 district grid numpy 3d array for each player actor,
+        # shared if they are in the same district.
+        districts_with_actors = {}
+        for key, value in actors_in_districts.items():
+            districts_with_actors.setdefault(value, []).append(key)  # invert mapping
+        for loc_actor in districts_with_actors.items():
+            loc = loc_actor[0]
+            actor = loc_actor[1]
+            district_index = np.nonzero(self.districts_grid == loc)  # returns y,x pair
+            get_y = [district_index[0][0]]
+            get_x = [district_index[1][0]]
+            if district_index[0] != 0:
+                get_y.append(district_index[0][0] - 1)
+            if district_index[0] != self.districts_grid.shape[0]:
+                get_y.append(district_index[0][0] + 1)
+            if district_index[1] != 0:
+                get_x.append(district_index[1][0] - 1)
+            if district_index[1] != self.districts_grid.shape[1]:
+                get_x.append(district_index[1][0] + 1)
+            for y in get_y:
+                for x in get_x:
+                    district = self.districts_grid[y][x]
+                    if self.districts[district] is None:
+                        self.districts[district] = get_district(int(district))
 
 
 class Map:
-    def __init__(self, y=100, x=100, z=30):
+    # each player in a unique district has one of these, contains their FoV and navmap. NPCs and players in the same
+    # spot calculate their FoV and nav as a sub of this playerMap
+    def __init__(self, y=100, x=100, z=30):  # todo pass in the already complete 3d nparray
         # address by z,y,x 0,0,0 is bottom height, west, and north
         # https://stackoverflow.com/a/15311166
 
@@ -179,8 +204,7 @@ class Map:
     #     pass
 
 
-def get_district(district):
-
+def get_district(district: int):
     try:
         globalvar.cursor.execute("SELECT map FROM mapdata WHERE id=%s", (district,))
         map_data = globalvar.cursor.fetchone()[0]

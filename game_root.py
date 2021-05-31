@@ -59,6 +59,7 @@ class Game:
         # self.conn.commit()
         if os.environ['DATABASE_URL'].__contains__("localhost"):
             self.new_character(300, {'userName': 'epthed_test', 'characterName': 'epthed'})
+            self.new_character(30000, {'userName': 'epthed_test2', 'characterName': 'epthed2'})
             # self.map._testmap()
 
             self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com',

@@ -30,31 +30,31 @@ def before_server_start(sanic, loop):
 
 
 @sio.event
-async def my_event(sid, message):
+async def my_event(sid: str, message: dict):
     await sio.emit('my_response', {'data': message['data']}, room=sid)
 
 
 @sio.event
-async def my_broadcast_event(sid, message):
+async def my_broadcast_event(sid: str, message: dict):
     await sio.emit('my_response', {'data': message['data']})
 
 
 @sio.event
-async def join(sid, message):
+async def join(sid: str, message: dict):
     sio.enter_room(sid, message['room'])
     await sio.emit('my_response', {'data': 'Entered room: ' + message['room']},
                    room=sid)
 
 
 @sio.event
-async def leave(sid, message):
+async def leave(sid: str, message: dict):
     sio.leave_room(sid, message['room'])
     await sio.emit('my_response', {'data': 'Left room: ' + message['room']},
                    room=sid)
 
 
 @sio.event
-async def close_room(sid, message):
+async def close_room(sid: str, message: dict):
     await sio.emit('my_response',
                    {'data': 'Room ' + message['room'] + ' is closing.'},
                    room=message['room'])
@@ -62,29 +62,29 @@ async def close_room(sid, message):
 
 
 @sio.event
-async def my_room_event(sid, message):
+async def my_room_event(sid: str, message: dict):
     await sio.emit('my_response', {'data': message['data']},
                    room=message['room'])
 
 
 @sio.event
-async def disconnect_request(sid):
+async def disconnect_request(sid: str):
     await sio.disconnect(sid)
 
 
 @sio.event
-async def connect(sid, environ):
+async def connect(sid: str, environ):
     print("Client", sid, "connected")
     await sio.emit('my_response', {'data': 'Connected', 'count': 0}, room=sid)
 
 
 @sio.event
-def disconnect(sid):
+def disconnect(sid: str):
     print('Client disconnected', sid)
 
 
 @sio.event
-async def new_character(sid, message):
+async def new_character(sid: str, message: dict):
     game.new_character(sid, message)
     await sio.emit('new_character',
                    {'message': "Character " + message['characterName'] + " was created for user " + message['userName'],
@@ -92,7 +92,7 @@ async def new_character(sid, message):
 
 
 @sio.event
-async def register(sid, message):
+async def register(sid: str, message: dict):
     success = game.register(sid, message)
     if success:
         await sio.emit('register', {'message': "User " + message + " was created", 'success': success}, room=sid)
@@ -101,7 +101,7 @@ async def register(sid, message):
 
 
 @sio.event
-async def authenticate(sid, message):
+async def authenticate(sid: str, message: dict):
     success = game.authenticate(sid, message)
     if success:
         await sio.emit('authenticate', {'message': "Welcome back " + message.username + ".", 'success': success},
