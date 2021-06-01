@@ -88,12 +88,12 @@ class Tile:
 
 class MapManager:
     def __init__(self):
-        self.districts_grid = np.arange(100).reshape(10, -1)  # 20 megs when exported
-        self.districts = []  # main memory object of all the districts
-        for district in range(100):
-            self.districts.append(None)
+        self.districts_grid = np.arange(100).reshape(10, -1)  # 20 megs when exported, 100x100 would fill up the prod
+        # DB on it's own. also each district is 1.2mb in memory. the server has 512mb total.
+        self.districts = [None] * 100  # main memory object of all the districts
+        self.districts_in_use = [0] * 100  # manual memory/usage counter of districts in use.
 
-    # todo expand for multiple sets of actors. Right now only handles a single actor
+
 
     def _testmap(self):
         # for idz, zSlice in enumerate(self._objectarray):  # z iteration, outside in
@@ -103,7 +103,7 @@ class MapManager:
         #                 cell.fluid = "test"
         #                 if self._objectarray[idz][idy][idx] == cell:
         #                     pass
-        example_tile = Tile(floor='concrete', fill='smoke')
+        example_tile = Tile(floor='concrete')
         debug_floor_number = example_tile.get_int()
         walkable = example_tile.walkable()
         seethrough = Tile(binaryarray=48).transparent()
@@ -115,9 +115,16 @@ class MapManager:
         test_insertion_target = insert(insert_array, test_insertion_target, loc=(0, 5, 5))
         pass
 
+    def load_district_from_yx(self, y: int, x: int):
+        district = self.districts_grid[y][x]
+        return self.districts[district]
+
     def update_districts(self, actors_in_districts: dict):
-        # function returns a 3x3 district grid numpy 3d array for each player actor,
+        # function returns a district grid numpy 3d array for each player actor,
         # shared if they are in the same district.
+        self.districts_in_use = [0] * 100  # reset memory counter
+        size = 2  # guarantee at least this * 100m visibility. 1: 300x300, 2: 500x500, 3:700x700
+        finalized_maps = []
         districts_with_actors = {}
         for key, value in actors_in_districts.items():
             districts_with_actors.setdefault(value, []).append(key)  # invert mapping
@@ -127,19 +134,42 @@ class MapManager:
             district_index = np.nonzero(self.districts_grid == loc)  # returns y,x pair
             get_y = [district_index[0][0]]
             get_x = [district_index[1][0]]
-            if district_index[0] != 0:
-                get_y.append(district_index[0][0] - 1)
-            if district_index[0] != self.districts_grid.shape[0]:
-                get_y.append(district_index[0][0] + 1)
-            if district_index[1] != 0:
-                get_x.append(district_index[1][0] - 1)
-            if district_index[1] != self.districts_grid.shape[1]:
-                get_x.append(district_index[1][0] + 1)
+            max_y = self.districts_grid.shape[0] - 1  # last valid y index
+            max_x = self.districts_grid.shape[1] - 1
+            for i in range(1, size + 1):
+                if get_y[0] - i >= 0:
+                    # y north of core
+                    get_y.append(get_y[0] - i)
+                if get_y[0] + i <= max_y:
+                    # y south of core
+                    get_y.append(get_y[0] + i)
+                if get_x[0] - i >= 0:
+                    # x west of core
+                    get_x.append(get_x[0] - i)
+                if get_x[0] + i <= max_x:
+                    # x east of core
+                    get_x.append(get_x[0] + i)
             for y in get_y:
                 for x in get_x:
                     district = self.districts_grid[y][x]
+                    self.districts_in_use[district] += 1  # remember that this district is in use
                     if self.districts[district] is None:
                         self.districts[district] = get_district(int(district))
+                        # we now know all the districts we want are loaded.
+            y_rows = []
+            for y in sorted(get_y):
+                districts = []
+                for x in sorted(get_x):
+                    districts.append(self.load_district_from_yx(y, x))
+                    # districts.append(np.zeros((2, 2, 2))+y+x)  # test correct shape
+                y_rows.append(np.concatenate(districts, axis=2))
+            map_for_location = np.concatenate(y_rows, axis=1)
+            finalized_maps.append((actor, map_for_location))
+        for district, usage in enumerate(self.districts_in_use):
+            if usage == 0 and self.districts[district] is not None:
+                save_district(self.districts[district], district)
+                self.districts[district] = None
+        return finalized_maps
 
 
 class Map:
@@ -210,10 +240,10 @@ def get_district(district: int):
         map_data = globalvar.cursor.fetchone()[0]
         map_data = np.array(map_data)
     except TypeError:
+        globalvar.conn.rollback()
         map_data = np.zeros((30, 100, 100), dtype=np.uint32)
-        insert_object = json.dumps(map_data.tolist())
-        globalvar.cursor.execute("INSERT INTO mapdata (id, map) VALUES (%s, %s)", (district, insert_object))
-        globalvar.conn.commit()
+        map_data[0] = np.add(map_data[0], 48)
+        save_district(map_data, district)
     return map_data
 
 

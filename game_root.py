@@ -6,13 +6,13 @@ import random
 import os
 import psycopg2
 import hashlib
+import time
 
 import Components as c
 import Processors
 import websocket
 import gs_map
 import globalvar
-
 
 
 class Game:
@@ -60,7 +60,8 @@ class Game:
         if os.environ['DATABASE_URL'].__contains__("localhost"):
             self.new_character(300, {'userName': 'epthed_test', 'characterName': 'epthed'})
             self.new_character(30000, {'userName': 'epthed_test2', 'characterName': 'epthed2'})
-            # self.map._testmap()
+            # (_, mapManager) = self.world.get_component(gs_map.MapManager)[0]
+            # mapManager._testmap()
 
             self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com',
                                   'admin': False})  # in prod I'll manually set admin users with db runs
@@ -71,15 +72,20 @@ class Game:
             self.world.create_entity(c.Position(x=n, y=0), c.Person(name=names[n]))
 
         while True:
+            start = time.time()
             self.world.process()
+            end = time.time()
+            if end - start > .01:
+                print("main loop took", round((end - start) * 1000, 3), "ms")
             await sio.sleep(.1)  # try to run at a 10 tickrate? Maybe? Gives the main thread 10 chances per second to do
             # network IO stuff
 
             # print("world tick")
 
     def new_character(self, sid, message):
-        self.world.create_entity(c.Character(sid=sid, username=message['userName']), c.Position(),
-                                 c.Renderable(), c.Person(name=message['characterName']))
+        self.world.create_entity(c.Character(sid=sid, username=message['userName']),
+                                 c.Position(district=random.randint(0, 99)), c.Renderable(),
+                                 c.Person(name=message['characterName']))
 
     def register(self, sid, message):
         salt = os.urandom(16)

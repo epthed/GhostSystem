@@ -45,6 +45,7 @@ class DistrictProcessor(esper.Processor):
         (_, districts) = self.world.get_component(c.ActiveDistricts)[0]
         # districts = self.world.get_component(c.ActiveDistricts)
         current_districts = districts.actorsInDistricts.copy()
+        # print(current_districts)
         # districts.actorsInDistricts
         for ent, (character, position) in self.world.get_components(c.Character, c.Position):
             districts.actorsInDistricts[ent] = position.district
@@ -62,4 +63,5 @@ class MapProcessor(esper.Processor):
             (_, mapManager) = self.world.get_component(gs_map.MapManager)[0]
             (_, districts) = self.world.get_component(c.ActiveDistricts)[0]
 
-            mapManager.update_districts(districts.actorsInDistricts)
+            maps = mapManager.update_districts(districts.actorsInDistricts)
+            pass
