@@ -1,6 +1,6 @@
 #LOW PRIORITY
 the rest of the materials  
-
+look at reducing chunk sizes? increasing chunk sizes? Limited to 10k rows.
 everything else  
 
 #TODO
@@ -9,7 +9,7 @@ persist connection/authorization - cookies?
 figure out global vs per-actor position addressing  
 python test suite coverage  
 per-actor pathing  
-
+graceful shutdown
 my apartment test map
 
 #IN PROGRESS

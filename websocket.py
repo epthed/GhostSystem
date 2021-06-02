@@ -1,8 +1,10 @@
 from sanic import Sanic
 from sanic.response import redirect
+from threading import Thread
 import asyncio
 import socketio
 import os
+from time import sleep
 
 from game_root import Game
 
@@ -26,7 +28,19 @@ async def handler(request):
 
 @goFast.listener('before_server_start')
 def before_server_start(sanic, loop):
-    sio.start_background_task(game.game_loop, sio, sanic, loop)
+    goFast.add_task(game.game_loop(sio, sanic, loop))
+
+
+@goFast.listener('before_server_stop')
+def before_server_stop(sanic, loop):
+    print("got nice stop, trying to stop the background thread")
+    game.stop()
+
+
+@goFast.listener('main_process_stop')
+def main_process_stop(sanic, loop):
+    print("main process ending after nice stop")  # ends up not called, not a big deal
+    # look here if nicer end needed https://stackoverflow.com/questions/37417595/graceful-shutdown-of-asyncio-coroutines
 
 
 @sio.event

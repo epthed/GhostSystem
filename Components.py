@@ -1,10 +1,11 @@
 from numba import jit, njit
 import numba as nb
+from dataclasses import dataclass, field
 
 from gs_map import get_district, Map
 
 # could use numpy arrays for map, fov, navigation maps, etc.
-
+# use dataclasses for most things here
 class Position:
     #@jit("(None),(None)", nopython=True, nogil=True, cache=True)
     def __init__(self, z=0.0, y=0.0, x=0.0, district=55): # address by z,y,x and district
@@ -25,9 +26,9 @@ class Position:
 #             self.x = x
 #             self.y = y
 
+@dataclass
 class ActiveDistricts:
-    def __init__(self):
-        self.actorsInDistricts = {}
+    actorsInDistricts: dict = field(default_factory=dict)
 
 class Renderable:
     pass
@@ -35,11 +36,11 @@ class Renderable:
 class UpdateMap:
     pass
 
+@dataclass
 class Character:
     # stuff that only counts for player characters
-    def __init__(self, sid, username):
-                self.sid = sid
-                self.username = username
+    sid: str
+    username: str
 
 class Person:
     # sentient beings, probably differentiate from robots and ghosts later

@@ -20,7 +20,7 @@ class Game:
     def __init__(self):
 
         self.world = esper.World()
-
+        self.stopping = False
         # self.map = gs_map.MapManager()
         globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS test (id serial PRIMARY KEY, num integer, data varchar);")
         globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS users (id serial PRIMARY KEY,"
@@ -71,21 +71,28 @@ class Game:
         for n in range(4):
             self.world.create_entity(c.Position(x=n, y=0), c.Person(name=names[n]))
 
-        while True:
+        while not self.stopping:
             start = time.time()
             self.world.process()
             end = time.time()
             if end - start > .01:
                 print("main loop took", round((end - start) * 1000, 3), "ms")
+            # print("main thread tick")
             await sio.sleep(.1)  # try to run at a 10 tickrate? Maybe? Gives the main thread 10 chances per second to do
-            # network IO stuff
 
-            # print("world tick")
+        print("received shutdown signal, exited main game_loop")
+        # todo add graceful shutdown stuff here
+        globalvar.conn.commit()
+        globalvar.conn.close()
+        os._exit(0)  # exits the entire program without throwing error, but doesn't cleanup web connections.
 
     def new_character(self, sid, message):
         self.world.create_entity(c.Character(sid=sid, username=message['userName']),
                                  c.Position(district=random.randint(0, 99)), c.Renderable(),
                                  c.Person(name=message['characterName']))
+
+    def stop(self):
+        self.stopping = True
 
     def register(self, sid, message):
         salt = os.urandom(16)
