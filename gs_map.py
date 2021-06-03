@@ -2,7 +2,7 @@ import numpy as np
 import json
 from json import JSONEncoder
 from bitarray import bitarray, util
-from typing import Union
+from typing import Union, List
 
 from materials import materials, material_id
 import globalvar
@@ -91,7 +91,8 @@ class MapManager:
         self.districts_grid = np.arange(100).reshape(10, -1)  # 20 megs when exported, 100x100 would fill up the prod
         # DB on it's own. also each district is 1.2mb in memory. the server has 512mb total.
         self.districts = [None] * 100  # main memory object of all the districts
-        self.districts_in_use = [0] * 100  # manual memory/usage counter of districts in use.
+        self.districts_in_use = [0] * 100  # counter of districts in use for active actors
+        self.districts_active_maps = [None] * 100
 
 
 
@@ -119,18 +120,13 @@ class MapManager:
         district = self.districts_grid[y][x]
         return self.districts[district]
 
-    def update_districts(self, actors_in_districts: dict):
+    def update_districts(self, active_districts: List[int]):
         # function returns a district grid numpy 3d array for each player actor,
         # shared if they are in the same district.
         self.districts_in_use = [0] * 100  # reset memory counter
         size = 2  # guarantee at least this * 100m visibility. 1: 300x300, 2: 500x500, 3:700x700
         finalized_maps = []
-        districts_with_actors = {}
-        for key, value in actors_in_districts.items():
-            districts_with_actors.setdefault(value, []).append(key)  # invert mapping
-        for loc_actor in districts_with_actors.items():
-            loc = loc_actor[0]
-            actor = loc_actor[1]
+        for loc in active_districts:
             district_index = np.nonzero(self.districts_grid == loc)  # returns y,x pair
             get_y = [district_index[0][0]]
             get_x = [district_index[1][0]]
@@ -164,18 +160,17 @@ class MapManager:
                     # districts.append(np.zeros((2, 2, 2))+y+x)  # test correct shape
                 y_rows.append(np.concatenate(districts, axis=2))
             map_for_location = np.concatenate(y_rows, axis=1)
-            finalized_maps.append((actor, map_for_location))
+            self.districts_active_maps[loc] = map_for_location
         for district, usage in enumerate(self.districts_in_use):
             if usage == 0 and self.districts[district] is not None:
                 save_district(self.districts[district], district)
                 self.districts[district] = None
-        return finalized_maps
 
 
 class Map:
-    # each player in a unique district has one of these, contains their FoV and navmap. NPCs and players in the same
+    # each active district has one of these, contains their FoV and navmap. NPCs and players in the same
     # spot calculate their FoV and nav as a sub of this playerMap
-    def __init__(self, y=100, x=100, z=30):  # todo pass in the already complete 3d nparray
+    def __init__(self, y=100, x=100, z=30):  #
         # address by z,y,x 0,0,0 is bottom height, west, and north
         # https://stackoverflow.com/a/15311166
 

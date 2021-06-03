@@ -34,16 +34,13 @@ def after_server_start(sanic, loop):
 @goFast.listener('before_server_stop')
 async def before_server_stop(sanic, loop):
     print("got nice stop, trying to stop the background thread")
-    # game.stop()
     sanic.background_task.cancel()
     await sanic.background_task
     print("done stopping background thread")
-    # sanic.stop()
     for task in asyncio.Task.all_tasks(loop):
         if task.get_coro().cr_code.co_name != "before_server_stop":
             task.cancel()  # cancel all tasks except this one
     for eio_session in sio.eio.sockets.keys():  # boot everyone out so we can shutdown
-        # print(eio_session)
         session = sio.manager.sid_from_eio_sid(eio_session, "/")
         await sio.disconnect(session)
 

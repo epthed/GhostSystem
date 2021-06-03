@@ -1,6 +1,7 @@
 from numba import jit, njit
 import numba as nb
 from dataclasses import dataclass, field
+from typing import List
 
 from gs_map import get_district, Map
 
@@ -28,7 +29,12 @@ class Position:
 
 @dataclass
 class ActiveDistricts:
-    actorsInDistricts: dict = field(default_factory=dict)
+    active_districts: List[int] = field(default_factory=list)
+
+@dataclass
+class DistrictMap:
+    district: int
+    map: Map
 
 class Renderable:
     pass

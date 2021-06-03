@@ -9,7 +9,6 @@ persist connection/authorization - cookies?
 figure out global vs per-actor position addressing  
 python test suite coverage  
 per-actor pathing  
-graceful shutdown
 my apartment test map
 
 #IN PROGRESS
@@ -22,11 +21,13 @@ per-actor fov
     than the native Z 2d got.
     easy version: Up and down on Z level until blocked, can't see diagonal. Problem: shooting from balcony
     solution: Drop Z up and downs from adjacent visible squares. 
-
+Per-district Map  
+    
 
 
 #DONE
-Per-actor Map  
+graceful shutdown
+
 fixed deploy issues  
 make materials a function not a class  
 map representation - use 2^7 bits for the 4 materials  

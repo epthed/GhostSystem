@@ -44,13 +44,14 @@ class DistrictProcessor(esper.Processor):
     def process(self):
         (_, districts) = self.world.get_component(c.ActiveDistricts)[0]
         # districts = self.world.get_component(c.ActiveDistricts)
-        current_districts = districts.actorsInDistricts.copy()
+        current_districts = list(set(districts.active_districts))
         # print(current_districts)
-        # districts.actorsInDistricts
+        # districts.active_districts
         for ent, (character, position) in self.world.get_components(c.Character, c.Position):
-            districts.actorsInDistricts[ent] = position.district
-        if (districts.actorsInDistricts != current_districts) and (len(districts.actorsInDistricts) > 0):
-            self.world.add_component(_, c.UpdateMap())
+            districts.active_districts.append(position.district)
+        districts.active_districts = list(set(districts.active_districts))
+        if (districts.active_districts != current_districts) and (len(districts.active_districts) > 0):
+            self.world.add_component(_, c.UpdateMap())  # todo right now it updates all of them
 
 
 class MapProcessor(esper.Processor):
@@ -63,5 +64,10 @@ class MapProcessor(esper.Processor):
             (_, mapManager) = self.world.get_component(gs_map.MapManager)[0]
             (_, districts) = self.world.get_component(c.ActiveDistricts)[0]
 
-            maps = mapManager.update_districts(districts.actorsInDistricts)
-            pass
+            for ent, (map) in self.world.get_component(c.DistrictMap):
+                self.world.delete_entity(ent)  # todo right now it deletes all of them
+
+            mapManager.update_districts(districts.active_districts)
+            for district in districts.active_districts:
+                self.world.create_entity(c.DistrictMap(district=district,
+                                                       map=gs_map.Map(mapManager.districts_active_maps[district])))
