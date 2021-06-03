@@ -17,7 +17,6 @@ goFast = Sanic(name="GhostSystem Local")
 sio.attach(goFast)
 game = Game()
 
-
 # todo graceful handling of sigterm
 
 
@@ -26,21 +25,27 @@ async def handler(request):
     return redirect("https://ghostsystem-web.herokuapp.com/")
 
 
-@goFast.listener('before_server_start')
-def before_server_start(sanic, loop):
-    goFast.add_task(game.game_loop(sio, sanic, loop))
+@goFast.listener('after_server_start')
+def after_server_start(sanic, loop):
+    sanic.background_task = loop.create_task(game.game_loop(sio, sanic, loop))
+    pass
 
 
 @goFast.listener('before_server_stop')
-def before_server_stop(sanic, loop):
+async def before_server_stop(sanic, loop):
     print("got nice stop, trying to stop the background thread")
-    game.stop()
-
-
-@goFast.listener('main_process_stop')
-def main_process_stop(sanic, loop):
-    print("main process ending after nice stop")  # ends up not called, not a big deal
-    # look here if nicer end needed https://stackoverflow.com/questions/37417595/graceful-shutdown-of-asyncio-coroutines
+    # game.stop()
+    sanic.background_task.cancel()
+    await sanic.background_task
+    print("done stopping background thread")
+    # sanic.stop()
+    for task in asyncio.Task.all_tasks(loop):
+        if task.get_coro().cr_code.co_name != "before_server_stop":
+            task.cancel()  # cancel all tasks except this one
+    for eio_session in sio.eio.sockets.keys():  # boot everyone out so we can shutdown
+        # print(eio_session)
+        session = sio.manager.sid_from_eio_sid(eio_session, "/")
+        await sio.disconnect(session)
 
 
 @sio.event

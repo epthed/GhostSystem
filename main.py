@@ -10,7 +10,8 @@ import websocket
 
 
 def main() -> None:
-    websocket.goFast.run(host='0.0.0.0', port=int(os.environ.get('PORT')), workers=1)  # database sync error with multi
+    websocket.goFast.run(host='0.0.0.0', port=int(os.environ.get('PORT')), workers=1, debug=False)
+    # database sync error with multiple workers
 
 
 if __name__ == "__main__":

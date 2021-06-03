@@ -7,6 +7,7 @@ import os
 import psycopg2
 import hashlib
 import time
+from asyncio import CancelledError
 
 import Components as c
 import Processors
@@ -71,20 +72,27 @@ class Game:
         for n in range(4):
             self.world.create_entity(c.Position(x=n, y=0), c.Person(name=names[n]))
 
-        while not self.stopping:
-            start = time.time()
-            self.world.process()
-            end = time.time()
-            if end - start > .01:
-                print("main loop took", round((end - start) * 1000, 3), "ms")
-            # print("main thread tick")
-            await sio.sleep(.1)  # try to run at a 10 tickrate? Maybe? Gives the main thread 10 chances per second to do
+        while True:
+            try:
+                start = time.time()
+                self.world.process()
+                end = time.time()
+                if end - start > .01:
+                    print("main loop took", round((end - start) * 1000, 3), "ms")
+                # print("main thread tick")
+                await sio.sleep(
+                    .1)  # try to run at a 10 tickrate? Maybe? Gives the main thread 10 chances per second to do
+            except CancelledError:
+                print("received shutdown signal, exited main game_loop")
+                # todo add moregraceful shutdown stuff here
+                globalvar.conn.commit()
+                globalvar.conn.close()
+                return
+            except Exception as e:
+                print("unhandled exception during game loop")
+                raise Exception(e)
 
-        print("received shutdown signal, exited main game_loop")
-        # todo add graceful shutdown stuff here
-        globalvar.conn.commit()
-        globalvar.conn.close()
-        os._exit(0)  # exits the entire program without throwing error, but doesn't cleanup web connections.
+        # os._exit(0)  # exits the entire program without throwing error, but doesn't cleanup web connections.
 
     def new_character(self, sid, message):
         self.world.create_entity(c.Character(sid=sid, username=message['userName']),
