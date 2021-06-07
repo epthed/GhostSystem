@@ -21,13 +21,13 @@ per-actor fov
     than the native Z 2d got.
     easy version: Up and down on Z level until blocked, can't see diagonal. Problem: shooting from balcony
     solution: Drop Z up and downs from adjacent visible squares. 
-Per-district Map  
     
 
 
 #DONE
 graceful shutdown
 
+Per-district Map  
 fixed deploy issues  
 make materials a function not a class  
 map representation - use 2^7 bits for the 4 materials  

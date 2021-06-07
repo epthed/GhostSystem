@@ -296,7 +296,11 @@ def arrangement_from_2d(z_map: np.array):
     return vs
 
 
-@njit(parallel=False)  # disabling parallel, strange issues on heroku
+@njit(parallel=True)  # logging strangeness.
+# 2021-06-07T03:09:04.545100+00:00 app[web.1]: updating map
+# 2021-06-07T03:09:04.545113+00:00 app[web.1]: main loop took 4924.948 ms
+# 2021-06-07T03:09:04.545113+00:00 app[web.1]: updating map
+# 2021-06-07T03:09:04.545115+00:00 app[web.1]: main loop took 853.462 ms
 def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilities_index: List,
                                      _map: np.array) -> np.array:
     '''

@@ -48,7 +48,10 @@ class Character:
     sid: str
     username: str
 
+
+@dataclass
 class Person:
     # sentient beings, probably differentiate from robots and ghosts later
-    def __init__(self, name: str):
-                self.name = name
+   name: str
+   need_fov_update: bool
+   fov: Any

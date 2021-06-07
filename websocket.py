@@ -17,8 +17,6 @@ goFast = Sanic(name="GhostSystem Local")
 sio.attach(goFast)
 game = Game()
 
-# todo graceful handling of sigterm
-
 
 @goFast.get('/')
 async def handler(request):
