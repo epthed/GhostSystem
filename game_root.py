@@ -58,7 +58,7 @@ class Game:
         #
         # test = self.cursor.fetchall()
         # self.conn.commit()
-        if os.environ['DATABASE_URL'].__contains__("localhost"):
+        if os.environ['DATABASE_URL'].__contains__("localhost"):  # todo these should be moved to a test suite
             self.new_character(300, {'userName': 'epthed_test', 'characterName': 'epthed'})
             self.new_character(30000, {'userName': 'epthed_test2', 'characterName': 'epthed2'})
             # (_, mapManager) = self.world.get_component(gs_map.MapManager)[0]
@@ -95,9 +95,10 @@ class Game:
         # os._exit(0)  # exits the entire program without throwing error, but doesn't cleanup web connections.
 
     def new_character(self, sid, message):
-        self.world.create_entity(c.Character(sid=sid, username=message['userName']),
-                                 c.Position(district=random.randint(0, 99)), c.Renderable(),
-                                 c.Person(name=message['characterName']))
+        ent = self.world.create_entity(c.Character(sid=sid, username=message['userName']),
+                                       c.Position(district=random.randint(0, 99)), c.Renderable(),
+                                       c.Person(name=message['characterName']))
+        return ent
 
     def stop(self):
         self.stopping = True

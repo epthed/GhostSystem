@@ -296,7 +296,7 @@ def arrangement_from_2d(z_map: np.array):
     return vs
 
 
-@njit(parallel=True)
+@njit(parallel=False)  # disabling parallel, strange issues on heroku
 def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilities_index: List,
                                      _map: np.array) -> np.array:
     '''
