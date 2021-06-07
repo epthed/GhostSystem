@@ -57,17 +57,17 @@ class DistrictProcessor(esper.Processor):
 class MapProcessor(esper.Processor):
     def process(self):
         for ent, (position) in self.world.get_component(c.UpdateMap):
+            print("updating map")
             # only continue processing if the mapupdate component-tag is present
-            # todo trigger mapupdate on map changing as well as players moving around
+            # todo trigger update on map changing as well as players moving around
             self.world.remove_component(ent, c.UpdateMap)
             # ^^^ remove it and continue processing. Always remove non-() components
             (_, mapManager) = self.world.get_component(gs_map.MapManager)[0]
             (_, districts) = self.world.get_component(c.ActiveDistricts)[0]
 
-            for ent, (map) in self.world.get_component(c.DistrictMap):
-                self.world.delete_entity(ent)  # todo right now it deletes all of them
+            for _, (map_object) in self.world.get_component(gs_map.Map):
+                self.world.delete_entity(_, immediate=True)  # todo right now it deletes all of them
 
             mapManager.update_districts(districts.active_districts)
             for district in districts.active_districts:
-                self.world.create_entity(c.DistrictMap(district=district,
-                                                       map=gs_map.Map(mapManager.districts_active_maps[district])))
+                self.world.create_entity(gs_map.Map(mapManager.districts_active_maps[district], district=district))

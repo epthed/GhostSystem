@@ -1,3 +1,7 @@
+# from numba import njit
+# from numba.typed import Dict, List
+
+
 def materials(material):
     if type(material) == int:
         return mat[material]
@@ -81,4 +85,7 @@ mat = [
 ]
 material_dict = {}
 for m in mat:
+    # n = Dict()
+    # for key, item in m.items():
+    #     n[key] = item
     material_dict[m['name']] = m

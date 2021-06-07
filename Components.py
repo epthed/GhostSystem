@@ -31,10 +31,10 @@ class Position:
 class ActiveDistricts:
     active_districts: List[int] = field(default_factory=list)
 
-@dataclass
-class DistrictMap:
-    district: int
-    map: Map
+# @dataclass
+# class DistrictMap:
+#     district: int
+#     map: Map
 
 class Renderable:
     pass

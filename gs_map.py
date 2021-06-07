@@ -2,7 +2,11 @@ import numpy as np
 import json
 from json import JSONEncoder
 from bitarray import bitarray, util
-from typing import Union, List
+from typing import Union, Tuple
+from skgeom import Segment2, Point2, arrangement, RotationalSweepVisibility, TriangularExpansionVisibility
+from numba import njit, int8
+from numba.experimental import jitclass
+from numba.typed import List, Dict
 
 from materials import materials, material_id
 import globalvar
@@ -63,19 +67,19 @@ class Tile:
         self.binaryarray[14:21] = self.north
         self.binaryarray[21:28] = self.floor
 
-    def walkable(self) -> (bool, bool, bool, bool):
+    def blocking(self) -> (bool, bool, bool, bool):
         fill = materials(util.ba2int(self.fill))
         west = materials(util.ba2int(self.west))
         north = materials(util.ba2int(self.north))
         floor = materials(util.ba2int(self.floor))
-        return not fill['blocking'], not west['blocking'], not north['blocking'], not floor['blocking']
+        return fill['blocking'], west['blocking'], north['blocking'], floor['blocking']
 
-    def transparent(self) -> (bool, bool, bool, bool):
+    def opaque(self) -> (bool, bool, bool, bool):
         fill = materials(util.ba2int(self.fill))
         west = materials(util.ba2int(self.west))
         north = materials(util.ba2int(self.north))
         floor = materials(util.ba2int(self.floor))
-        return not fill['opaque'], not west['opaque'], not north['opaque'], not floor['opaque']
+        return fill['opaque'], west['opaque'], north['opaque'], floor['opaque']
 
 
 # save and load an individual tile
@@ -90,13 +94,11 @@ class MapManager:
     def __init__(self):
         self.districts_grid = np.arange(100).reshape(10, -1)  # 20 megs when exported, 100x100 would fill up the prod
         # DB on it's own. also each district is 1.2mb in memory. the server has 512mb total.
-        self.districts = [None] * 100  # main memory object of all the districts
+        self.districts: Union[None, np.array] = [None] * 100  # main memory object of all the districts
         self.districts_in_use = [0] * 100  # counter of districts in use for active actors
         self.districts_active_maps = [None] * 100
 
-
-
-    def _testmap(self):
+    def _testmap(self):  # debug/learning function
         # for idz, zSlice in enumerate(self._objectarray):  # z iteration, outside in
         #     for idy, ySlice in enumerate(zSlice):
         #         for idx, cell in enumerate(ySlice):
@@ -104,16 +106,25 @@ class MapManager:
         #                 cell.fluid = "test"
         #                 if self._objectarray[idz][idy][idx] == cell:
         #                     pass
-        example_tile = Tile(floor='concrete')
-        debug_floor_number = example_tile.get_int()
-        walkable = example_tile.walkable()
-        seethrough = Tile(binaryarray=48).transparent()
+        conc_floor = Tile(floor='concrete').get_int()
+        conc_west = Tile(west='concrete', floor='concrete').get_int()
+        conc_north = Tile(north='concrete', floor='concrete').get_int()
+        conc_northwest = Tile(west='concrete', north='concrete', floor='concrete').get_int()
+        # walkable = example_tile.walkable()
+        seethrough = Tile(binaryarray=48).opaque()
         # for district in range(100):
         #     self.districts[district] = get_district(district)
         insert_array = np.zeros((2, 5, 5), dtype=np.uint32)
         insert_array = np.add(insert_array, 55)
         test_insertion_target = np.zeros((30, 100, 100), dtype=np.uint32)
         test_insertion_target = insert(insert_array, test_insertion_target, loc=(0, 5, 5))
+
+        self.nparray = np.zeros((30, 100, 100), dtype=np.uint32)
+        self.nparray[0] = self.nparray[0] + 48  # 48 is concrete/3 floor with nothing else. setting
+        insert_array = np.zeros((1, 5, 5), dtype=np.uint32)
+        insert_array = np.add(insert_array, 67108912)
+        self.nparray = insert(insert_array, self.nparray, loc=(0, 3, 3))
+
         pass
 
     def load_district_from_yx(self, y: int, x: int):
@@ -124,7 +135,7 @@ class MapManager:
         # function returns a district grid numpy 3d array for each player actor,
         # shared if they are in the same district.
         self.districts_in_use = [0] * 100  # reset memory counter
-        size = 2  # guarantee at least this * 100m visibility. 1: 300x300, 2: 500x500, 3:700x700
+        size = 1  # guarantee at least this * 100m visibility. 1: 300x300, 2: 500x500, 3:700x700
         finalized_maps = []
         for loc in active_districts:
             district_index = np.nonzero(self.districts_grid == loc)  # returns y,x pair
@@ -147,7 +158,7 @@ class MapManager:
                     get_x.append(get_x[0] + i)
             for y in get_y:
                 for x in get_x:
-                    district = self.districts_grid[y][x]
+                    district: int = self.districts_grid[y][x]
                     self.districts_in_use[district] += 1  # remember that this district is in use
                     if self.districts[district] is None:
                         self.districts[district] = get_district(int(district))
@@ -170,63 +181,157 @@ class MapManager:
 class Map:
     # each active district has one of these, contains their FoV and navmap. NPCs and players in the same
     # spot calculate their FoV and nav as a sub of this playerMap
-    def __init__(self, y=100, x=100, z=30):  #
+    def __init__(self, _nparray: np.array, district: int):  #
         # address by z,y,x 0,0,0 is bottom height, west, and north
         # https://stackoverflow.com/a/15311166
+        # print("initializing a map for", district)
+        self.map = _nparray
+        self.district = district
+        self.z_levels = [None] * self.map.shape[0]
+        self.initialize_skgeom()
+        # self.fov = True  # use setter to force recalculation
 
-        self.nparray = np.zeros((30, 100, 100), dtype=np.uint32)
-        self.nparray[0] = self.nparray[0] + 48  # 48 is concrete/3 floor with nothing else. setting
-        insert_array = np.zeros((1, 5, 5), dtype=np.uint32)
-        insert_array = np.add(insert_array, 67108912)
-        self.nparray = insert(insert_array, self.nparray, loc=(0, 3, 3))
+    def initialize_skgeom(self):
+        # contextually map the geometry of the nparray into many skgeom.arrangement
+        for z_level, z_map in enumerate(self.map):
+            self.z_levels[z_level] = arrangement_from_2d(z_map)
+        pass
 
-        self.fov = True  # use setter to force recalculation
 
-    @property
-    def transparent(self) -> np.ndarray:
-        return self.transparent
+def arrangement_from_2d(z_map: np.array):
+    # y,x 0,0 is top left
+    max_x = z_map.shape[1]
+    max_y = z_map.shape[0]
+    outer = [
+        Segment2(Point2(0, 0), Point2(0, max_x)), Segment2(Point2(0, max_x), Point2(max_y, max_x)),
+        Segment2(Point2(max_y, max_x), Point2(max_y, 0)), Segment2(Point2(max_y, 0), Point2(0, 0))
+    ]
+    unique_visibilities = List()  # todo provide type in constructor?
+    unique_visibilities_index = List()
+    outer_box = arrangement.Arrangement()
+    for s in outer:
+        outer_box.insert(s)
+    for unique_integer in np.unique(z_map):
+        unique_visibilities.append(Tile(binaryarray=unique_integer).opaque())
+        unique_visibilities_index.append(unique_integer)
+        # locations[unique_integer] = np.nonzero(z_map == unique_integer)
+    exit_filled, exit_empty = 0, 0
+    for [fill, west, north, _] in unique_visibilities:  # early exit if all empty or full
+        if not (fill or west or north):
+            exit_empty += 1
+        if fill:
+            exit_filled += 1
+    if exit_empty == len(unique_visibilities_index):
+        vs = TriangularExpansionVisibility(outer_box)
+        return vs
+    # for key, item in locals().items():
+    #     print(key, type(item))
+    # print("initial")
+    # West  y`=y   x'=x-1
+    # North y`=y-1 x'=x
+    # South y'=y+1 x'=x
+    # East  y'=y   x'=x+1
 
-    @property
-    def walkable(self) -> np.ndarray:
-        return self.walkable
-
-    @property
-    def fov(self) -> np.ndarray:
-        return self.fov
-
-    @fov.setter
-    def fov(self, value):
-        unique_tiles = np.unique(self.nparray)
-        visibility_angles = []
-        for source in unique_tiles:
-            for destination in unique_tiles:
-                local_valid_paths = []
-                source_transparency = Tile(binaryarray=source).transparent()
-                destination_transparency = Tile(binaryarray=destination).transparent()
-                if not source_transparency[0] or not destination_transparency[0]:  # if the source or dest is filled
-                    # with opaque materials then set all direction checks to false
-                    visibility_angles.append([False, False, False, False, False, False, False, False])
-                    continue
-                # each of the directions in order
-                local_valid_paths.append((source_transparency[1] and source_transparency[2]))  # 0 north or west
-                local_valid_paths.append(source_transparency[2])  # 1 north
-                local_valid_paths.append((destination_transparency[1] and source_transparency[2]))  # 2 north or east
-
-                visibility_angles.append(local_valid_paths)
-                pass
-
-        # try constructing 2d numpy boolean list of valid visible tile/walls
-        # 0 1 2
-        # 3 s 4    "s" is source tile
-        # 5 6 7
-        # combinatorial: example 0-0, 0-48, 48-0, 48-48 scales with uniques^2
-        # return not fill['opaque'], not west['opaque'], not north['opaque'], not floor['opaque']
-
+    horizontal, vertical = visibility_geometry_from_nparray(unique_visibilities, unique_visibilities_index, z_map)
+    arr = arrangement.Arrangement()
+    for s in outer:
+        arr.insert(s)
+    # try to scan down each row for continual lines
+    for y in range(horizontal.shape[0]):
+        start = None
+        for x in range(horizontal.shape[1]):
+            if horizontal[y, x]:
+                # if we're to draw a line here
+                if start is None:
+                    start = Point2(y, x)
+                continue
+            if start is not None:
+                finish = Point2(y, x)
+                arr.insert(Segment2(start, finish))
+                start = None
+    # try to scan down each column for continual lines
+    for x in range(vertical.shape[1]):
+        start = None
+        for y in range(vertical.shape[0]):
+            if vertical[y, x]:
+                # if we're to draw a line here
+                if start is None:
+                    start = Point2(y, x)
+                continue
+            if start is not None:
+                finish = Point2(y, x)
+                arr.insert(Segment2(start, finish))
+                start = None
+    # for s in segments:
+    #     s = Segment2(Point2(s[0], s[1]), Point2(s[2], s[3]))
+    #     arr.insert(s)
+    vs = TriangularExpansionVisibility(arr)  # calc and store the precomputed triangular expansion information
+    # # from here until return is debug
+    # for key, item in locals().items():
+    #     print(key, type(item))
+    # print("finale")
+    # exit(0)
+    # q = Point2(.5, .75)
+    # face = outer_box.find(q)
+    # vx = vs.compute_visibility(q, face)
+    # print(sum(1 for item in iter(arr.vertices)), sum(1 for item in iter(arr.faces)),
+    #       sum(1 for item in iter(arr.halfedges)))
+    # print(sum(1 for item in iter(vx.vertices)), sum(1 for item in iter(vx.faces)),
+    #       sum(1 for item in iter(vx.halfedges)))
+    # draw.plt.xlim([0, 10])
+    # draw.plt.ylim([0, 10])
+    # draw.plt.gcf().set_dpi(300)
+    # for he in arr.halfedges:
+    #     draw.draw(he.curve(), visible_point=True)
+    # for v in vx.halfedges:
+    #     draw.draw(v.curve(), color='red', visible_point=False)
+    # draw.draw(q, color='magenta')
+    # # fig = draw.plt.figure()
+    # # fig.set_ylim(0, 10)
     #
-    # @transparent.setter
-    # def transparent(self, recalculate):
-    #
-    #     pass
+    # # fig.set_xlim(0, 10)
+    # draw.plt.show()
+    # x=12
+    # pass
+    return vs
+
+
+@njit(parallel=True)
+def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilities_index: List,
+                                     _map: np.array) -> np.array:
+    '''
+    West  y=>y   x=>x-1
+    North y=>y-1 x=>x
+    South y=>y+1 x=>x
+    East  y=>y   x=>x+1
+    '''
+    # geometries = np.array([[1, 2, 3, 4]], dtype=np.int64)
+    horizontal = np.zeros(_map.shape, dtype=np.bool8)  # declare horizonal array
+    vertical = np.zeros(_map.shape, dtype=np.bool8)  # declare vertical array
+    # fill['opaque'], not west['opaque'], not north['opaque'],
+    for y in range(_map.shape[0]):
+        for x in range(_map.shape[1]):
+            # visibility_info = Tile(binaryarray=map_integer).transparent()
+            tile_int = _map[y, x]
+            tile_index = unique_visibilities_index.index(tile_int)
+            fill, west, north, _ = unique_visibilities[tile_index]
+            if fill:
+                if x != 0:
+                    vertical[y, x] = True  # west
+                if y != 0:
+                    horizontal[y, x] = True  # north
+                if y != _map.shape[0] - 1:
+                    horizontal[y + 1, x] = True  # south
+                if x != _map.shape[1] - 1:
+                    vertical[y, x + 1] = True  # east
+                continue
+            if west and x != 0:
+                vertical[y, x] = True  # west
+            if north and y != 0:
+                horizontal[y, x] = True  # north
+    # geometries = geometries[1:]
+    pass
+    return horizontal, vertical
 
 
 def get_district(district: int):
@@ -238,6 +343,15 @@ def get_district(district: int):
         globalvar.conn.rollback()
         map_data = np.zeros((30, 100, 100), dtype=np.uint32)
         map_data[0] = np.add(map_data[0], 48)
+        conc_floor = Tile(floor='concrete').get_int()
+        conc_west = Tile(west='concrete', floor='concrete').get_int()
+        conc_north = Tile(north='concrete', floor='concrete').get_int()
+        conc_northwest = Tile(west='concrete', north='concrete', floor='concrete').get_int()
+        map_data[0][1:4, 1:4] = np.array([
+            [conc_west, conc_northwest, conc_west],
+            [conc_west, conc_floor, conc_west],
+            [conc_north, conc_north, conc_floor]
+        ])
         save_district(map_data, district)
     return map_data
 
