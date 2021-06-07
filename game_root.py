@@ -90,6 +90,7 @@ class Game:
                 return
             except Exception as e:
                 print("unhandled exception during game loop")
+                print(e)
                 raise Exception(e)
 
         # os._exit(0)  # exits the entire program without throwing error, but doesn't cleanup web connections.

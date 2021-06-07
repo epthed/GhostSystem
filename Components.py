@@ -53,5 +53,5 @@ class Character:
 class Person:
     # sentient beings, probably differentiate from robots and ghosts later
    name: str
-   need_fov_update: bool
-   fov: Any
+   need_fov_update: bool = True
+   fov = None

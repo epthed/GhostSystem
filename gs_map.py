@@ -266,7 +266,7 @@ def arrangement_from_2d(z_map: np.array):
     #     s = Segment2(Point2(s[0], s[1]), Point2(s[2], s[3]))
     #     arr.insert(s)
     vs = TriangularExpansionVisibility(arr)  # calc and store the precomputed triangular expansion information
-    # # from here until return is debug
+    # from here until return is debug
     # for key, item in locals().items():
     #     print(key, type(item))
     # print("finale")
@@ -286,10 +286,10 @@ def arrangement_from_2d(z_map: np.array):
     # for v in vx.halfedges:
     #     draw.draw(v.curve(), color='red', visible_point=False)
     # draw.draw(q, color='magenta')
-    # # fig = draw.plt.figure()
-    # # fig.set_ylim(0, 10)
-    #
-    # # fig.set_xlim(0, 10)
+    # fig = draw.plt.figure()
+    # fig.set_ylim(0, 10)
+
+    # fig.set_xlim(0, 10)
     # draw.plt.show()
     # x=12
     # pass
