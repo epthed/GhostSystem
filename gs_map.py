@@ -270,7 +270,9 @@ class Map:
                 for y in range(int(bbox.xmin()), int(bbox.xmax())):
                     for x in range(int(bbox.ymin()), int(bbox.ymax())):
                         q = Point2(y + .5, x + .5)
-                        if visible_polygon.oriented_side(q) == 1:
+                        sign = visible_polygon.oriented_side(q)
+                        if sign == 1 or sign == 0:  # 1 is inside, 0 is on the edge, -1 is outside.
+                            # include edge visibility as a design choice
                             if len(z_levels) == 1:
                                 visible_map[0, y, x] = True
                             else:
