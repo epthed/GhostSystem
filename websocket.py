@@ -49,6 +49,11 @@ async def my_event(sid: str, message: dict):
 
 
 @sio.event
+async def map_update(sid: str, message):
+    await sio.emit('map', {'data': message['data']}, room=sid)
+
+
+@sio.event
 async def my_broadcast_event(sid: str, message: dict):
     await sio.emit('my_response', {'data': message['data']})
 

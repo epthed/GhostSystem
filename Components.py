@@ -7,13 +7,13 @@ from gs_map import get_district, Map
 
 # could use numpy arrays for map, fov, navigation maps, etc.
 # use dataclasses for most things here
+#@jit("(None),(None)", nopython=True, nogil=True, cache=True)
+@dataclass
 class Position:
-    #@jit("(None),(None)", nopython=True, nogil=True, cache=True)
-    def __init__(self, z=0.0, y=0.0, x=0.0, district=55): # address by z,y,x and district
-        self.z = z
-        self.y = y
-        self.x = x
-        self.district = district
+    z:int = 0
+    y:int = 0
+    x:int = 0
+    district:int = 55
 #
 # class EntityMap:
 #     def __init__(self, district=55):
@@ -31,16 +31,19 @@ class Position:
 class ActiveDistricts:
     active_districts: List[int] = field(default_factory=list)
 
-# @dataclass
-# class DistrictMap:
-#     district: int
-#     map: Map
+class DistrictMaps:
+    def __init__(self):
+        self.mapList: List(Union(None, Map)) = [None] * 100
 
 class Renderable:
     pass
 
 class UpdateMap:
     pass
+
+class UpdateFov:
+    pass
+
 
 @dataclass
 class Character:
@@ -53,5 +56,4 @@ class Character:
 class Person:
     # sentient beings, probably differentiate from robots and ghosts later
    name: str
-   need_fov_update: bool = True
    fov = None

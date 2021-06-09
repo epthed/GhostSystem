@@ -50,9 +50,11 @@ class Game:
         self.world.add_processor(Processors.MovementProcessor())
         self.world.add_processor(Processors.DistrictProcessor())
         self.world.add_processor(Processors.MapProcessor())
+        self.world.add_processor(Processors.FovProcessor(sio=sio))
 
         # make the map handler
         self.world.create_entity(c.ActiveDistricts())
+        self.world.create_entity(c.DistrictMaps())
         # self.cursor.execute("INSERT INTO test (num, data) VALUES (%s, %s)", (100, "abc'def"))
         # self.cursor.execute("SELECT * FROM test;")
         #
@@ -70,7 +72,7 @@ class Game:
 
         names = ['John', 'Bob', 'Jimbo', 'Brick']
         for n in range(4):
-            self.world.create_entity(c.Position(x=n, y=0), c.Person(name=names[n]))
+            self.world.create_entity(c.Position(x=n, y=0), c.Person(name=names[n]), c.UpdateFov())
 
         while True:
             try:
@@ -84,7 +86,6 @@ class Game:
                     .1)  # try to run at a 10 tickrate? Maybe? Gives the main thread 10 chances per second to do
             except CancelledError:
                 print("received shutdown signal, exited main game_loop")
-                # todo add moregraceful shutdown stuff here
                 globalvar.conn.commit()
                 globalvar.conn.close()
                 return
@@ -98,7 +99,7 @@ class Game:
     def new_character(self, sid, message):
         ent = self.world.create_entity(c.Character(sid=sid, username=message['userName']),
                                        c.Position(district=random.randint(0, 99)), c.Renderable(),
-                                       c.Person(name=message['characterName']))
+                                       c.Person(name=message['characterName']), c.UpdateFov())
         return ent
 
     def stop(self):

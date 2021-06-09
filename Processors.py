@@ -1,8 +1,10 @@
 import esper
 from numba import njit
-# import socketio
+# import socketio as sio
 # import websocket
 import asyncio
+from skgeom import Polygon
+import numpy as np
 
 import Components as c
 import gs_map
@@ -18,6 +20,8 @@ class MovementProcessor(esper.Processor):
     def process(self):
         pass
         # for ent, (vel, pos) in self.world.get_components(c.Velocity, c.Position):
+        # todo add set updateFoV after something moves
+
         #     # pos.x += vel.x
         #     # pos.y += vel.y
         #     pos.x, pos.y = _jitmovementprocessor(vel.x, vel.y, pos.x, pos.y)
@@ -64,10 +68,40 @@ class MapProcessor(esper.Processor):
             # ^^^ remove it and continue processing. Always remove non-() components
             (_, mapManager) = self.world.get_component(gs_map.MapManager)[0]
             (_, districts) = self.world.get_component(c.ActiveDistricts)[0]
-
-            for _, (map_object) in self.world.get_component(gs_map.Map):
-                self.world.delete_entity(_, immediate=True)  # todo right now it deletes all of them
+            (_, maps) = self.world.get_component(c.DistrictMaps)[0]
+            # for _, (map_object) in self.world.get_component(gs_map.Map):
+            #     self.world.delete_entity(_, immediate=True)  # todo redo deletion
 
             mapManager.update_districts(districts.active_districts)
+            # for district in districts.active_districts:
+            #     self.world.create_entity(gs_map.Map(mapManager.districts_active_maps[district], district=district))
             for district in districts.active_districts:
-                self.world.create_entity(gs_map.Map(mapManager.districts_active_maps[district], district=district))
+                maps.mapList[district] = gs_map.Map(mapManager.districts_active_maps[district], district=district)
+
+
+class FovProcessor(esper.Processor):
+    def __init__(self, sio):
+        self.sio = sio
+
+    def process(self):
+        updated_fovs = []
+        for ent, (_) in self.world.get_component(c.UpdateFov):
+            person = self.world.component_for_entity(ent, c.Person)
+            position = self.world.component_for_entity(ent, c.Position)
+            (_, maps) = self.world.get_component(c.DistrictMaps)[0]
+            if maps.mapList[position.district] is None:
+                updated_fovs.append(ent)
+                continue
+            person.fov = maps.mapList[position.district].calc_fov(position.z, position.y, position.x)
+            # person.fov[0] = array of boolean grid visibility, [1] is horizontal walls, [2] is vertical walls
+            if self.world.has_component(ent, c.Character):
+                character = self.world.component_for_entity(ent, c.Character)
+                # todo get render information here
+
+                asyncio.create_task(self.sio.emit('map_update', to=character.sid, data="you did it ayyy"))
+                # todo send and catch the info
+            updated_fovs.append(ent)
+        for _ in updated_fovs:
+            self.world.remove_component(_, c.UpdateFov)
+
+            pass

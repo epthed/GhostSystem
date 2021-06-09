@@ -3,7 +3,8 @@ import json
 from json import JSONEncoder
 from bitarray import bitarray, util
 from typing import Union, Tuple
-from skgeom import Segment2, Point2, arrangement, RotationalSweepVisibility, TriangularExpansionVisibility
+from skgeom import Segment2, Point2, arrangement, RotationalSweepVisibility, TriangularExpansionVisibility, \
+    PolygonSet, Polygon, Sign
 from numba import njit, int8
 from numba.experimental import jitclass
 from numba.typed import List, Dict
@@ -196,6 +197,87 @@ class Map:
         for z_level, z_map in enumerate(self.map):
             self.z_levels[z_level] = arrangement_from_2d(z_map)
         pass
+
+    def calc_fov(self, z_in: int = 0, y_in: int = 0, x_in: int = 0, need_3d: bool = False):
+        max_x = self.map.shape[2]
+        max_y = self.map.shape[1]
+        max_z = self.map.shape[0]
+        outer = [
+            Segment2(Point2(0, 0), Point2(0, max_x)), Segment2(Point2(0, max_x), Point2(max_y, max_x)),
+            Segment2(Point2(max_y, max_x), Point2(max_y, 0)), Segment2(Point2(max_y, 0), Point2(0, 0))
+        ]
+        outer_box = arrangement.Arrangement()
+        for s in outer:
+            outer_box.insert(s)
+
+        wall_horizontal = []
+        wall_vertical = []
+        z_levels = []
+        # simple drop ray on the single z column. todo real 3d with zx and zy
+        if need_3d:
+            visible_map = np.zeros(self.map.shape, dtype=np.bool8)
+            if z_in != 0:
+                for z in reversed(range(z_in)):
+                    tile = Tile(binaryarray=self.map[z + 1, y_in, x_in]).opaque()
+                    if not (tile[0] or tile[3]):  # if opaque floor or fill
+                        z_levels.append(z)
+            if z_in != max_z:
+                for z in range(z_in + 1, max_z - 1):
+
+                    tile = Tile(binaryarray=self.map[z + 1, y_in, x_in]).opaque()
+                    if not (tile[0] or tile[3]):  # if opaque floor or fill
+                        z_levels.append(z)
+                        if z == max_z - 2:
+                            z_levels.append(z + 1)
+        else:
+            visible_map = np.zeros((1, max_y, max_x), dtype=np.bool8)
+        z_levels.append(z_in)
+        for z in z_levels:
+            vs = self.z_levels[z]
+            q = Point2(y_in + .5, x_in + .5)
+            face = outer_box.find(q)
+            vx = vs.compute_visibility(q, face)
+
+            visible_polygon = Polygon([item.point() for item in vx.vertices])
+            bbox = visible_polygon.bbox()
+
+            for edge in visible_polygon.edges:
+                if edge.is_vertical():  # ***is_horizontal*** and is_vertical are swapped because of y,x convention
+                    y = int(edge.source().x().__float__())
+                    if y == 0 or y == max_y: continue
+                    x_start = edge.source().y().__float__()  # iterate upward from lower x until >= x_dest
+                    x_dest = edge.target().y().__float__()
+                    if x_dest < x_start:
+                        x_start, x_dest = x_dest, x_start
+                    for x in range(int(x_start), int(x_dest + .9)):  # add .9 and re-floor to show partial-visible walls
+                        wall_horizontal.append([y, x, self.map[z, y, x]])
+                if edge.is_horizontal():  # ***is_vertical***
+                    x = int(edge.source().y().__float__())
+                    if x == 0 or x == max_x: continue
+                    y_start = edge.source().x().__float__()  # iterate upward from lower y
+                    y_dest = edge.target().x().__float__()
+                    if y_dest < y_start:
+                        y_start, y_dest = y_dest, y_start
+                    for y in range(int(y_start), int(y_dest + .9)):  # add .9 and re-floor to show partial-visible walls
+                        wall_vertical.append([y, x, self.map[z, y, x]])
+            # todo loop through all y,x in bounding box and get map info if oriented_side(y.5,x.5) is positive
+            if sum(1 for item in iter(vx.vertices)) == 4:
+                if len(z_levels) == 1:
+                    visible_map[:] = True
+                else:
+                    visible_map[z] = True
+            else:
+                for y in range(int(bbox.xmin()), int(bbox.xmax())):
+                    for x in range(int(bbox.ymin()), int(bbox.ymax())):
+                        q = Point2(y + .5, x + .5)
+                        if visible_polygon.oriented_side(q) == 1:
+                            if len(z_levels) == 1:
+                                visible_map[0, y, x] = True
+                            else:
+                                visible_map[z, y, x] = True
+
+        pass
+        return visible_map, wall_horizontal, wall_vertical
 
 
 def arrangement_from_2d(z_map: np.array):
