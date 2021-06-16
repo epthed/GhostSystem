@@ -49,7 +49,7 @@ async def my_event(sid: str, message: dict):
 
 
 @sio.event
-async def map_update(sid: str, message):
+async def map_update(sid: str, message):  # this is only to catch map_update thrown from client
     await sio.emit('map', {'data': message['data']}, room=sid)
 
 

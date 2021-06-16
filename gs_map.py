@@ -208,57 +208,7 @@ class Map:
         #     fov_object.update_map(self.map) # todo smart incrementalism
         visible = self.fov.calc_fov(z_in, y_in, x_in)
         return visible
-        wall_horizontal = []
-        wall_vertical = []
 
-        for z in z_levels:
-            vs = self.z_levels[z]
-            q = Point2(y_in + .5, x_in + .5)
-            face = outer_box.find(q)
-            vx = vs.compute_visibility(q, face)
-
-            visible_polygon = Polygon([item.point() for item in vx.vertices])
-            bbox = visible_polygon.bbox()
-
-            for edge in visible_polygon.edges:
-                if edge.is_vertical():  # ***is_horizontal*** and is_vertical are swapped because of y,x convention
-                    y = int(edge.source().x().__float__())
-                    if y == 0 or y == max_y: continue
-                    x_start = edge.source().y().__float__()  # iterate upward from lower x until >= x_dest
-                    x_dest = edge.target().y().__float__()
-                    if x_dest < x_start:
-                        x_start, x_dest = x_dest, x_start
-                    for x in range(int(x_start), int(x_dest + .9)):  # add .9 and re-floor to show partial-visible walls
-                        wall_horizontal.append([y, x, self.map[z, y, x]])
-                if edge.is_horizontal():  # ***is_vertical***
-                    x = int(edge.source().y().__float__())
-                    if x == 0 or x == max_x: continue
-                    y_start = edge.source().x().__float__()  # iterate upward from lower y
-                    y_dest = edge.target().x().__float__()
-                    if y_dest < y_start:
-                        y_start, y_dest = y_dest, y_start
-                    for y in range(int(y_start), int(y_dest + .9)):  # add .9 and re-floor to show partial-visible walls
-                        wall_vertical.append([y, x, self.map[z, y, x]])
-            # todo loop through all y,x in bounding box and get map info if oriented_side(y.5,x.5) is positive
-            if sum(1 for item in iter(vx.vertices)) == 4:  # if the z level is empty
-                if not need_3d:
-                    visible_map[:] = True
-                else:
-                    visible_map[z] = True
-            else:
-                for y in range(int(bbox.xmin()), int(bbox.xmax())):
-                    for x in range(int(bbox.ymin()), int(bbox.ymax())):
-                        q = Point2(y + .5, x + .5)
-                        sign = visible_polygon.oriented_side(q)
-                        if sign == 1 or sign == 0:  # 1 is inside, 0 is on the edge, -1 is outside.
-                            # include edge visibility as a design choice
-                            if not need_3d:
-                                visible_map[0, y, x] = True
-                            else:
-                                visible_map[z, y, x] = True
-
-        pass
-        return fov_object
 
 
 class FieldOfView:  # One of these per district. Persons ask this class what they can see
@@ -331,10 +281,10 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
             test_segment = Segment_3(viewpoint, center)
             if z == 0 and location == 0:
                 if not self.aabb.do_intersect(test_segment):  # check if intersect any slabs for the ground
-                    visible_slabs.append((z, y, x, slab_id, location))
+                    visible_slabs.append((z, y, x, int(slab_id), location))
             else:
                 if self.aabb.number_of_intersected_primitives(test_segment) < 2:
-                    visible_slabs.append((z, y, x, slab_id, location))
+                    visible_slabs.append((z, y, x, int(slab_id), location))
         return visible_slabs
         pass
 

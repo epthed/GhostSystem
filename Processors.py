@@ -4,6 +4,7 @@ from numba import njit
 # import websocket
 import asyncio
 import numpy as np
+import json
 
 import Components as c
 import gs_map
@@ -97,7 +98,8 @@ class FovProcessor(esper.Processor):
                 character = self.world.component_for_entity(ent, c.Character)
                 # todo get render information here
 
-                asyncio.create_task(self.sio.emit('map_update', to=character.sid, data="you did it ayyy"))
+                asyncio.create_task(self.sio.emit('map_update', to=character.sid,
+                                                  data={'data': json.dumps(person.fov)}))
                 # todo send and catch the info
             updated_fovs.append(ent)
         for _ in updated_fovs:
