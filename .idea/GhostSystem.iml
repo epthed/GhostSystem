@@ -4,6 +4,31 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.idea/dataSources" />
       <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/AABB_tree/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Advancing_front_surface_reconstruction/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Alpha_shape_2/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Box_intersection_d/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Classification/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Convex_hull_2/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Convex_hull_3/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/HalfedgeDS/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Interpolation/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Java/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Kernel/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Mesh_2/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Mesh_3/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Point_set_3/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Point_set_processing_3/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Polygon_mesh_processing/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Polyhedron_3/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Polyline_simplification_2/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Shape_detection/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Spatial_searching/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Surface_mesher/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Triangulation_2/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Triangulation_3/CMakeFiles" />
+      <excludeFolder url="file://$MODULE_DIR$/cgal-swig-bindings/SWIG_CGAL/Voronoi_diagram_2/CMakeFiles" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.8 (ghostsystem)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
