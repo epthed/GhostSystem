@@ -98,7 +98,8 @@ class Game:
 
     def new_character(self, sid, message):
         ent = self.world.create_entity(c.Character(sid=sid, username=message['userName']),
-                                       c.Position(district=random.randint(0, 99)), c.Renderable(),
+                                       # c.Position(district=random.randint(0, 99)), c.Renderable(),
+                                       c.Position(district=55), c.Renderable(),
                                        c.Person(name=message['characterName']), c.UpdateFov())
         return ent
 

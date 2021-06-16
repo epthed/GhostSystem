@@ -3,7 +3,6 @@ from numba import njit
 # import socketio as sio
 # import websocket
 import asyncio
-from skgeom import Polygon
 import numpy as np
 
 import Components as c
@@ -90,9 +89,9 @@ class FovProcessor(esper.Processor):
             position = self.world.component_for_entity(ent, c.Position)
             (_, maps) = self.world.get_component(c.DistrictMaps)[0]
             if maps.mapList[position.district] is None:
-                updated_fovs.append(ent)
+                updated_fovs.append(ent)  # if the map isn't initialized yet, don't worry about it. will work next tick.
                 continue
-            person.fov = maps.mapList[position.district].calc_fov(position.z, position.y, position.x)
+            person.fov = maps.mapList[position.district].calc_fov_map(position.z, position.y, position.x)
             # person.fov[0] = array of boolean grid visibility, [1] is horizontal walls, [2] is vertical walls
             if self.world.has_component(ent, c.Character):
                 character = self.world.component_for_entity(ent, c.Character)

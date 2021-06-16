@@ -56,4 +56,4 @@ class Character:
 class Person:
     # sentient beings, probably differentiate from robots and ghosts later
    name: str
-   fov = None
+   fov = None  #only the results of a FoV query. Map district holds the FieldOfView object

@@ -5,11 +5,18 @@ channels:
 dependencies:
   - numba
   - pip
-  - python=3.8.*
+  - python
   - python-socketio
   - sanic
   - bitarray
-  - scikit-geometry
+  - cgal
+  - swig
+  - cmake
+  - python-devtools
+  - libgcc-ng
+  - cxx-compiler
+  #  - python-cgal-bindings
   - pip:
       - esper==1.3
       - psycopg2-binary
+#      - cgal-bindings

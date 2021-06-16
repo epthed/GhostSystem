@@ -3,8 +3,9 @@ import json
 from json import JSONEncoder
 from bitarray import bitarray, util
 from typing import Union, Tuple
-from skgeom import Segment2, Point2, arrangement, RotationalSweepVisibility, TriangularExpansionVisibility, \
-    PolygonSet, Polygon, Sign
+from CGAL.CGAL_Polyhedron_3 import Polyhedron_3
+from CGAL.CGAL_AABB_tree import AABB_tree_Polyhedron_3_Facet_handle
+from CGAL.CGAL_Kernel import Point_3, centroid, Segment_3
 from numba import njit, int8
 from numba.experimental import jitclass
 from numba.typed import List, Dict
@@ -81,6 +82,13 @@ class Tile:
         north = materials(util.ba2int(self.north))
         floor = materials(util.ba2int(self.floor))
         return fill['opaque'], west['opaque'], north['opaque'], floor['opaque']
+
+    def opaque_id(self) -> (int, int, int, int):
+        fill = materials(util.ba2int(self.fill))
+        west = materials(util.ba2int(self.west))
+        north = materials(util.ba2int(self.north))
+        floor = materials(util.ba2int(self.floor))
+        return fill['number'], west['number'], north['number'], floor['number']
 
 
 # save and load an individual tile
@@ -188,50 +196,20 @@ class Map:
         # print("initializing a map for", district)
         self.map = _nparray
         self.district = district
-        self.z_levels = [None] * self.map.shape[0]
-        self.initialize_skgeom()
+        # self.initialize_skgeom()
         # self.fov = True  # use setter to force recalculation
+        self.fov = None
 
-    def initialize_skgeom(self):
-        # contextually map the geometry of the nparray into many skgeom.arrangement
-        for z_level, z_map in enumerate(self.map):
-            self.z_levels[z_level] = arrangement_from_2d(z_map)
-        pass
-
-    def calc_fov(self, z_in: int = 0, y_in: int = 0, x_in: int = 0, need_3d: bool = False):
-        max_x = self.map.shape[2]
-        max_y = self.map.shape[1]
-        max_z = self.map.shape[0]
-        outer = [
-            Segment2(Point2(0, 0), Point2(0, max_x)), Segment2(Point2(0, max_x), Point2(max_y, max_x)),
-            Segment2(Point2(max_y, max_x), Point2(max_y, 0)), Segment2(Point2(max_y, 0), Point2(0, 0))
-        ]
-        outer_box = arrangement.Arrangement()
-        for s in outer:
-            outer_box.insert(s)
-
+    def calc_fov_map(self, z_in: int = 0, y_in: int = 0, x_in: int = 0):
+        if self.fov is None:
+            self.fov = FieldOfView(self.map)
+        # else:
+        #     fov_object.update_map(self.map) # todo smart incrementalism
+        visible = self.fov.calc_fov(z_in, y_in, x_in)
+        return visible
         wall_horizontal = []
         wall_vertical = []
-        z_levels = []
-        # simple drop ray on the single z column. todo real 3d with zx and zy
-        if need_3d:
-            visible_map = np.zeros(self.map.shape, dtype=np.bool8)
-            if z_in != 0:
-                for z in reversed(range(z_in)):
-                    tile = Tile(binaryarray=self.map[z + 1, y_in, x_in]).opaque()
-                    if not (tile[0] or tile[3]):  # if opaque floor or fill
-                        z_levels.append(z)
-            if z_in != max_z:
-                for z in range(z_in + 1, max_z - 1):
 
-                    tile = Tile(binaryarray=self.map[z + 1, y_in, x_in]).opaque()
-                    if not (tile[0] or tile[3]):  # if opaque floor or fill
-                        z_levels.append(z)
-                        if z == max_z - 2:
-                            z_levels.append(z + 1)
-        else:
-            visible_map = np.zeros((1, max_y, max_x), dtype=np.bool8)
-        z_levels.append(z_in)
         for z in z_levels:
             vs = self.z_levels[z]
             q = Point2(y_in + .5, x_in + .5)
@@ -261,8 +239,8 @@ class Map:
                     for y in range(int(y_start), int(y_dest + .9)):  # add .9 and re-floor to show partial-visible walls
                         wall_vertical.append([y, x, self.map[z, y, x]])
             # todo loop through all y,x in bounding box and get map info if oriented_side(y.5,x.5) is positive
-            if sum(1 for item in iter(vx.vertices)) == 4:
-                if len(z_levels) == 1:
+            if sum(1 for item in iter(vx.vertices)) == 4:  # if the z level is empty
+                if not need_3d:
                     visible_map[:] = True
                 else:
                     visible_map[z] = True
@@ -273,30 +251,97 @@ class Map:
                         sign = visible_polygon.oriented_side(q)
                         if sign == 1 or sign == 0:  # 1 is inside, 0 is on the edge, -1 is outside.
                             # include edge visibility as a design choice
-                            if len(z_levels) == 1:
+                            if not need_3d:
                                 visible_map[0, y, x] = True
                             else:
                                 visible_map[z, y, x] = True
 
         pass
-        return visible_map, wall_horizontal, wall_vertical
+        return fov_object
 
 
-def arrangement_from_2d(z_map: np.array):
+class FieldOfView:  # One of these per district. Persons ask this class what they can see
+    # todo add initialization with geometry
+    # todo add function to return visible entities
+    def __init__(self, _nparray: np.array):
+        self.polygon = Polyhedron_3()
+        unique_visibilities = List()
+        unique_visibilities_index = List()
+        unique_visibilities_id = List()
+        for unique_integer in np.unique(_nparray):
+            unique_visibilities.append(Tile(binaryarray=unique_integer).opaque())
+            unique_visibilities_id.append(Tile(binaryarray=unique_integer).opaque_id())
+            unique_visibilities_index.append(unique_integer)
+
+        horizontal, vertical, flat = visibility_geometry_from_nparray(unique_visibilities, unique_visibilities_id,
+                                                                      unique_visibilities_index, _nparray)
+        self.potential_visible_slabs = []
+        horizontals = np.nonzero(horizontal)
+        verticals = np.nonzero(vertical)
+        flats = np.nonzero(flat)
+        for i in range(horizontals[0].shape[0]):
+            z = int(horizontals[0][i])
+            y = int(horizontals[1][i])
+            x = int(horizontals[2][i])
+            self.potential_visible_slabs.append((z, y, x,
+                                                 self.create_quad(Point_3(z, y, x),
+                                                                  Point_3(z, y, x + 1),
+                                                                  Point_3(z + 1, y, x + 1),
+                                                                  Point_3(z + 1, y, x), ),
+                                                 horizontal[z, y, x], 2))  # north
+        for i in range(verticals[0].shape[0]):
+            z = int(verticals[0][i])
+            y = int(verticals[1][i])
+            x = int(verticals[2][i])
+            self.potential_visible_slabs.append((z, y, x,
+                                                 self.create_quad(Point_3(z, y + 1, x),
+                                                                  Point_3(z, y, x),
+                                                                  Point_3(z + 1, y, x),
+                                                                  Point_3(z + 1, y + 1, x), ),
+                                                 vertical[z, y, x], 1))  # west
+        for i in range(flats[0].shape[0]):
+            z = int(flats[0][i])
+            y = int(flats[1][i])
+            x = int(flats[2][i])
+            self.potential_visible_slabs.append((z, y, x,
+                                                 self.create_quad(Point_3(z, y + 1, x),
+                                                                  Point_3(z, y + 1, x + 1),
+                                                                  Point_3(z, y, x + 1),
+                                                                  Point_3(z, y, x), ),
+                                                 flat[z, y, x], 0))  # floor
+        self.aabb = AABB_tree_Polyhedron_3_Facet_handle(self.polygon.facets())
+
+    def create_quad(self, a: Point_3, b: Point_3, c: Point_3, d: Point_3):  # must be inserted in ccw order
+        h = self.polygon.make_triangle(a, b, c)
+        g = self.polygon.split_edge(h)
+        g.vertex().set_point(d)
+        return centroid(a, b, c, d)
+
+    def update_map(self, _nparray: np.array):  # todo make this a smarter incremental and not nuke-n-pave
+        self.__init__(_nparray)
+
+    def calc_fov(self, z_in: int = 0, y_in: int = 0, x_in: int = 0):
+        viewpoint = Point_3(z_in + .5, y_in + .5, x_in + .5)
+        visible_slabs = []
+        for z, y, x, center, slab_id, location in self.potential_visible_slabs:
+            test_segment = Segment_3(viewpoint, center)
+            if self.aabb.number_of_intersected_primitives(test_segment) < 2:  # intersect any slabs besides itself?
+                visible_slabs.append((z, y, x, slab_id, location))
+        return visible_slabs
+        pass
+
+
+def arrangement_from_3d(_map: np.array):
     # y,x 0,0 is top left
-    max_x = z_map.shape[1]
-    max_y = z_map.shape[0]
-    outer = [
-        Segment2(Point2(0, 0), Point2(0, max_x)), Segment2(Point2(0, max_x), Point2(max_y, max_x)),
-        Segment2(Point2(max_y, max_x), Point2(max_y, 0)), Segment2(Point2(max_y, 0), Point2(0, 0))
-    ]
-    unique_visibilities = List()  # todo provide type in constructor?
+    max_x = _map.shape[2]
+    max_y = _map.shape[1]
+    max_z = _map.shape[0]
+    unique_visibilities = List()
     unique_visibilities_index = List()
-    outer_box = arrangement.Arrangement()
-    for s in outer:
-        outer_box.insert(s)
-    for unique_integer in np.unique(z_map):
+    unique_visibilities_id = List()
+    for unique_integer in np.unique(_map):
         unique_visibilities.append(Tile(binaryarray=unique_integer).opaque())
+        unique_visibilities_id.append(Tile(binaryarray=unique_integer).opaque_id())
         unique_visibilities_index.append(unique_integer)
         # locations[unique_integer] = np.nonzero(z_map == unique_integer)
     exit_filled, exit_empty = 0, 0
@@ -380,13 +425,10 @@ def arrangement_from_2d(z_map: np.array):
     return vs
 
 
-@njit(parallel=True)  # logging strangeness.
-# 2021-06-07T03:09:04.545100+00:00 app[web.1]: updating map
-# 2021-06-07T03:09:04.545113+00:00 app[web.1]: main loop took 4924.948 ms
-# 2021-06-07T03:09:04.545113+00:00 app[web.1]: updating map
-# 2021-06-07T03:09:04.545115+00:00 app[web.1]: main loop took 853.462 ms
-def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilities_index: List,
-                                     _map: np.array) -> np.array:
+# todo extend to 3d and feed the visibility class
+@njit(parallel=True)
+def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilities_id: List,
+                                     unique_visibilities_index: List, _map: np.array) -> (np.array, np.array, np.array):
     '''
     West  y=>y   x=>x-1
     North y=>y-1 x=>x
@@ -394,32 +436,39 @@ def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilit
     East  y=>y   x=>x+1
     '''
     # geometries = np.array([[1, 2, 3, 4]], dtype=np.int64)
-    horizontal = np.zeros(_map.shape, dtype=np.bool8)  # declare horizonal array
-    vertical = np.zeros(_map.shape, dtype=np.bool8)  # declare vertical array
+    horizontal = np.zeros(_map.shape, dtype=np.int8)  # declare horizonal wall array
+    vertical = np.zeros(_map.shape, dtype=np.int8)  # declare vertical wall array
+    flat = np.zeros(_map.shape, dtype=np.int8)  # declare floor/ceiling array
     # fill['opaque'], not west['opaque'], not north['opaque'],
-    for y in range(_map.shape[0]):
-        for x in range(_map.shape[1]):
-            # visibility_info = Tile(binaryarray=map_integer).transparent()
-            tile_int = _map[y, x]
-            tile_index = unique_visibilities_index.index(tile_int)
-            fill, west, north, _ = unique_visibilities[tile_index]
-            if fill:
-                if x != 0:
-                    vertical[y, x] = True  # west
-                if y != 0:
-                    horizontal[y, x] = True  # north
-                if y != _map.shape[0] - 1:
-                    horizontal[y + 1, x] = True  # south
-                if x != _map.shape[1] - 1:
-                    vertical[y, x + 1] = True  # east
-                continue
-            if west and x != 0:
-                vertical[y, x] = True  # west
-            if north and y != 0:
-                horizontal[y, x] = True  # north
+    for z in range(_map.shape[0]):
+        for y in range(_map.shape[1]):
+            for x in range(_map.shape[2]):
+                # visibility_info = Tile(binaryarray=map_integer).transparent()
+                tile_int = _map[z, y, x]
+                tile_index = unique_visibilities_index.index(tile_int)
+                slab_id_fill, slab_id_west, slab_id_north, slab_id_floor, = unique_visibilities_id[tile_index]
+                fill, west, north, floor = unique_visibilities[tile_index]
+                if fill:
+                    # any fills are overridden by explicit slabs
+                    if vertical[z, y, x] is np.int8(0): vertical[z, y, x] = slab_id_fill  # west
+                    if x != _map.shape[2] - 1:
+                        if vertical[z, y, x + 1] is np.int8(0): vertical[z, y, x + 1] = slab_id_fill  # east
+                    if horizontal[z, y, x] is np.int8(0): horizontal[z, y, x] = slab_id_fill  # north
+                    if y != _map.shape[1] - 1:
+                        if horizontal[z, y + 1, x] is np.int8(0): horizontal[z, y + 1, x] = slab_id_fill  # south
+                    if flat[z, y, x] is np.int8(0): flat[z, y, x] = slab_id_fill  # floor
+                    if z != _map.shape[0] - 1:
+                        if flat[z + 1, y, x] is np.int8(0): flat[z + 1, y, x] = slab_id_fill  # ceiling
+
+                if west and x != 0:
+                    vertical[z, y, x] = slab_id_west  # west
+                if north and y != 0:
+                    horizontal[z, y, x] = slab_id_north  # north
+                if floor:
+                    flat[z, y, x] = slab_id_floor  # floor
     # geometries = geometries[1:]
     pass
-    return horizontal, vertical
+    return horizontal, vertical, flat
 
 
 def get_district(district: int):

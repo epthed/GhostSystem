@@ -8,6 +8,7 @@ WORKDIR /opt/ghostsystem
 ENV PATH="/root/miniconda3/bin:${PATH}"
 ARG PATH="/root/miniconda3/bin:${PATH}"
 
+
 RUN wget \
     https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && mkdir /root/.conda \
@@ -16,8 +17,13 @@ RUN wget \
     && conda init bash \
     && conda update conda \
     && conda env create -f environment.yml
-# up until here is 1.7gb, thankfully unfrequently updated
+
 SHELL ["conda", "run", "-n", "ghostsystem", "/bin/bash", "-c"]
+RUN git clone https://github.com/cgal/cgal-swig-bindings \
+    && cd cgal-swig-bindings \
+    && conda run -n ghostsystem cmake -DCGAL_DIR=/usr/lib/CGAL \
+    && conda run -n ghostsystem make -j 8
+# up until here is 2.3 or 5gb, thankfully unfrequently updated
 
 # actually copy the code over
 COPY . /opt/ghostsystem/
