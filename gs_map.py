@@ -5,7 +5,7 @@ from bitarray import bitarray, util
 from typing import Union, Tuple
 from CGAL.CGAL_Polyhedron_3 import Polyhedron_3
 from CGAL.CGAL_AABB_tree import AABB_tree_Polyhedron_3_Facet_handle
-from CGAL.CGAL_Kernel import Point_3, centroid, Segment_3
+from CGAL.CGAL_Kernel import Point_3, centroid, Segment_3, Vector_3
 from numba import njit, int8
 from numba.experimental import jitclass
 from numba.typed import List, Dict
@@ -144,7 +144,8 @@ class MapManager:
         # function returns a district grid numpy 3d array for each player actor,
         # shared if they are in the same district.
         self.districts_in_use = [0] * 100  # reset memory counter
-        size = 1  # guarantee at least this * 100m visibility. 1: 300x300, 2: 500x500, 3:700x700
+        size = 2  # guarantee at least this * 100m visibility. 1: 300x300, 2: 500x500, 3:700x700
+        # changed district width to 30m. 1:90x90, 2:150x150
         finalized_maps = []
         for loc in active_districts:
             district_index = np.nonzero(self.districts_grid == loc)  # returns y,x pair
@@ -315,7 +316,10 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
         h = self.polygon.make_triangle(a, b, c)
         g = self.polygon.split_edge(h)
         g.vertex().set_point(d)
-        return centroid(a, b, c, d)
+        center = centroid(a, b, c, d)
+        if center.x() == 0:
+            center.set_coordinates(.1, center.y(), center.z())
+        return center
 
     def update_map(self, _nparray: np.array):  # todo make this a smarter incremental and not nuke-n-pave
         self.__init__(_nparray)
@@ -325,107 +329,16 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
         visible_slabs = []
         for z, y, x, center, slab_id, location in self.potential_visible_slabs:
             test_segment = Segment_3(viewpoint, center)
-            if self.aabb.number_of_intersected_primitives(test_segment) < 2:  # intersect any slabs besides itself?
-                visible_slabs.append((z, y, x, slab_id, location))
+            if z == 0 and location == 0:
+                if not self.aabb.do_intersect(test_segment):  # check if intersect any slabs for the ground
+                    visible_slabs.append((z, y, x, slab_id, location))
+            else:
+                if self.aabb.number_of_intersected_primitives(test_segment) < 2:
+                    visible_slabs.append((z, y, x, slab_id, location))
         return visible_slabs
         pass
 
 
-def arrangement_from_3d(_map: np.array):
-    # y,x 0,0 is top left
-    max_x = _map.shape[2]
-    max_y = _map.shape[1]
-    max_z = _map.shape[0]
-    unique_visibilities = List()
-    unique_visibilities_index = List()
-    unique_visibilities_id = List()
-    for unique_integer in np.unique(_map):
-        unique_visibilities.append(Tile(binaryarray=unique_integer).opaque())
-        unique_visibilities_id.append(Tile(binaryarray=unique_integer).opaque_id())
-        unique_visibilities_index.append(unique_integer)
-        # locations[unique_integer] = np.nonzero(z_map == unique_integer)
-    exit_filled, exit_empty = 0, 0
-    for [fill, west, north, _] in unique_visibilities:  # early exit if all empty or full
-        if not (fill or west or north):
-            exit_empty += 1
-        if fill:
-            exit_filled += 1
-    if exit_empty == len(unique_visibilities_index):
-        vs = TriangularExpansionVisibility(outer_box)
-        return vs
-    # for key, item in locals().items():
-    #     print(key, type(item))
-    # print("initial")
-    # West  y`=y   x'=x-1
-    # North y`=y-1 x'=x
-    # South y'=y+1 x'=x
-    # East  y'=y   x'=x+1
-
-    horizontal, vertical = visibility_geometry_from_nparray(unique_visibilities, unique_visibilities_index, z_map)
-    arr = arrangement.Arrangement()
-    for s in outer:
-        arr.insert(s)
-    # try to scan down each row for continual lines
-    for y in range(horizontal.shape[0]):
-        start = None
-        for x in range(horizontal.shape[1]):
-            if horizontal[y, x]:
-                # if we're to draw a line here
-                if start is None:
-                    start = Point2(y, x)
-                continue
-            if start is not None:
-                finish = Point2(y, x)
-                arr.insert(Segment2(start, finish))
-                start = None
-    # try to scan down each column for continual lines
-    for x in range(vertical.shape[1]):
-        start = None
-        for y in range(vertical.shape[0]):
-            if vertical[y, x]:
-                # if we're to draw a line here
-                if start is None:
-                    start = Point2(y, x)
-                continue
-            if start is not None:
-                finish = Point2(y, x)
-                arr.insert(Segment2(start, finish))
-                start = None
-    # for s in segments:
-    #     s = Segment2(Point2(s[0], s[1]), Point2(s[2], s[3]))
-    #     arr.insert(s)
-    vs = TriangularExpansionVisibility(arr)  # calc and store the precomputed triangular expansion information
-    # from here until return is debug
-    # for key, item in locals().items():
-    #     print(key, type(item))
-    # print("finale")
-    # exit(0)
-    # q = Point2(.5, .75)
-    # face = outer_box.find(q)
-    # vx = vs.compute_visibility(q, face)
-    # print(sum(1 for item in iter(arr.vertices)), sum(1 for item in iter(arr.faces)),
-    #       sum(1 for item in iter(arr.halfedges)))
-    # print(sum(1 for item in iter(vx.vertices)), sum(1 for item in iter(vx.faces)),
-    #       sum(1 for item in iter(vx.halfedges)))
-    # draw.plt.xlim([0, 10])
-    # draw.plt.ylim([0, 10])
-    # draw.plt.gcf().set_dpi(300)
-    # for he in arr.halfedges:
-    #     draw.draw(he.curve(), visible_point=True)
-    # for v in vx.halfedges:
-    #     draw.draw(v.curve(), color='red', visible_point=False)
-    # draw.draw(q, color='magenta')
-    # fig = draw.plt.figure()
-    # fig.set_ylim(0, 10)
-
-    # fig.set_xlim(0, 10)
-    # draw.plt.show()
-    # x=12
-    # pass
-    return vs
-
-
-# todo extend to 3d and feed the visibility class
 @njit(parallel=True)
 def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilities_id: List,
                                      unique_visibilities_index: List, _map: np.array) -> (np.array, np.array, np.array):
@@ -478,7 +391,7 @@ def get_district(district: int):
         map_data = np.array(map_data)
     except TypeError:
         globalvar.conn.rollback()
-        map_data = np.zeros((30, 100, 100), dtype=np.uint32)
+        map_data = np.zeros((30, 30, 30), dtype=np.uint32)
         map_data[0] = np.add(map_data[0], 48)
         conc_floor = Tile(floor='concrete').get_int()
         conc_west = Tile(west='concrete', floor='concrete').get_int()

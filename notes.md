@@ -14,8 +14,8 @@ my apartment test map
 #IN PROGRESS
 
 per-actor fov  
-    Get the init cost down
-    actually get Map.fov saving
+    Get the init cost down kinda done. 
+    actually get Map.fov saving. It is!
 
 
 #DONE
