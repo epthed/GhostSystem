@@ -210,9 +210,7 @@ class Map:
         return visible
 
 
-
 class FieldOfView:  # One of these per district. Persons ask this class what they can see
-    # todo add initialization with geometry
     # todo add function to return visible entities
     def __init__(self, _nparray: np.array):
         self.polygon = Polyhedron_3()
@@ -224,51 +222,64 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
             unique_visibilities_id.append(Tile(binaryarray=unique_integer).opaque_id())
             unique_visibilities_index.append(unique_integer)
 
-        horizontal, vertical, flat = visibility_geometry_from_nparray(unique_visibilities, unique_visibilities_id,
+        horizontal, vertical, flat = visibility_geometry_from_nparray(unique_visibilities_id,
                                                                       unique_visibilities_index, _nparray)
         self.potential_visible_slabs = []
         horizontals = np.nonzero(horizontal)
         verticals = np.nonzero(vertical)
         flats = np.nonzero(flat)
+
+        translucent_id = [1]  # material IDs that are to be shown, but don't block LoS. gonna be a long list eventually
+
         for i in range(horizontals[0].shape[0]):
             z = int(horizontals[0][i])
             y = int(horizontals[1][i])
             x = int(horizontals[2][i])
+            create_geom = True
+            if vertical[z, y, x] in translucent_id:
+                create_geom = False
             self.potential_visible_slabs.append((z, y, x,
                                                  self.create_quad(Point_3(z, y, x),
                                                                   Point_3(z, y, x + 1),
                                                                   Point_3(z + 1, y, x + 1),
-                                                                  Point_3(z + 1, y, x), ),
+                                                                  Point_3(z + 1, y, x), create_geom=create_geom),
                                                  horizontal[z, y, x], 2))  # north
         for i in range(verticals[0].shape[0]):
             z = int(verticals[0][i])
             y = int(verticals[1][i])
             x = int(verticals[2][i])
+            create_geom = True
+            if vertical[z, y, x] in translucent_id:
+                create_geom = False
             self.potential_visible_slabs.append((z, y, x,
                                                  self.create_quad(Point_3(z, y + 1, x),
                                                                   Point_3(z, y, x),
                                                                   Point_3(z + 1, y, x),
-                                                                  Point_3(z + 1, y + 1, x), ),
+                                                                  Point_3(z + 1, y + 1, x), create_geom=create_geom),
                                                  vertical[z, y, x], 1))  # west
         for i in range(flats[0].shape[0]):
             z = int(flats[0][i])
             y = int(flats[1][i])
             x = int(flats[2][i])
+            create_geom = True
+            if z == 0 or flat[z, y, x] in translucent_id:
+                create_geom = False
             self.potential_visible_slabs.append((z, y, x,
                                                  self.create_quad(Point_3(z, y + 1, x),
                                                                   Point_3(z, y + 1, x + 1),
                                                                   Point_3(z, y, x + 1),
-                                                                  Point_3(z, y, x), ),
+                                                                  Point_3(z, y, x), create_geom=create_geom),
                                                  flat[z, y, x], 0))  # floor
+
         self.aabb = AABB_tree_Polyhedron_3_Facet_handle(self.polygon.facets())
 
-    def create_quad(self, a: Point_3, b: Point_3, c: Point_3, d: Point_3):  # must be inserted in ccw order
-        h = self.polygon.make_triangle(a, b, c)
-        g = self.polygon.split_edge(h)
-        g.vertex().set_point(d)
+    def create_quad(self, a: Point_3, b: Point_3, c: Point_3, d: Point_3,
+                    create_geom=True):  # must be inserted in ccw order
+        if create_geom:
+            h = self.polygon.make_triangle(a, b, c)
+            g = self.polygon.split_edge(h)
+            g.vertex().set_point(d)
         center = centroid(a, b, c, d)
-        if center.x() == 0:
-            center.set_coordinates(.1, center.y(), center.z())
         return center
 
     def update_map(self, _nparray: np.array):  # todo make this a smarter incremental and not nuke-n-pave
@@ -276,7 +287,9 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
 
     def calc_fov(self, z_in: int = 0, y_in: int = 0, x_in: int = 0):
         viewpoint = Point_3(z_in + .5, y_in + .5, x_in + .5)
+        # destination = Point_3(z_in + 1, y_in + 1, x_in + 1)
         visible_slabs = []
+        # test_segment = Segment_3(viewpoint, destination)
         for z, y, x, center, slab_id, location in self.potential_visible_slabs:
             test_segment = Segment_3(viewpoint, center)
             if z == 0 and location == 0:
@@ -289,8 +302,8 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
         pass
 
 
-@njit(parallel=True)
-def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilities_id: List,
+@njit(parallel=True, cache=True)
+def visibility_geometry_from_nparray(unique_visibilities_id: List,
                                      unique_visibilities_index: List, _map: np.array) -> (np.array, np.array, np.array):
     '''
     West  y=>y   x=>x-1
@@ -310,8 +323,8 @@ def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilit
                 tile_int = _map[z, y, x]
                 tile_index = unique_visibilities_index.index(tile_int)
                 slab_id_fill, slab_id_west, slab_id_north, slab_id_floor, = unique_visibilities_id[tile_index]
-                fill, west, north, floor = unique_visibilities[tile_index]
-                if fill:
+                # fill, west, north, floor = unique_visibilities[tile_index]
+                if slab_id_fill != 0:
                     # any fills are overridden by explicit slabs
                     if vertical[z, y, x] is np.int8(0): vertical[z, y, x] = slab_id_fill  # west
                     if x != _map.shape[2] - 1:
@@ -323,11 +336,11 @@ def visibility_geometry_from_nparray(unique_visibilities: List, unique_visibilit
                     if z != _map.shape[0] - 1:
                         if flat[z + 1, y, x] is np.int8(0): flat[z + 1, y, x] = slab_id_fill  # ceiling
 
-                if west and x != 0:
+                if slab_id_west != 0 and x != 0:
                     vertical[z, y, x] = slab_id_west  # west
-                if north and y != 0:
+                if slab_id_north != 0 and y != 0:
                     horizontal[z, y, x] = slab_id_north  # north
-                if floor:
+                if slab_id_floor != 0:
                     flat[z, y, x] = slab_id_floor  # floor
     # geometries = geometries[1:]
     pass

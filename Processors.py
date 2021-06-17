@@ -100,7 +100,6 @@ class FovProcessor(esper.Processor):
 
                 asyncio.create_task(self.sio.emit('map_update', to=character.sid,
                                                   data={'data': json.dumps(person.fov)}))
-                # todo send and catch the info
             updated_fovs.append(ent)
         for _ in updated_fovs:
             self.world.remove_component(_, c.UpdateFov)
