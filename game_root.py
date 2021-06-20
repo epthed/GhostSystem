@@ -61,7 +61,7 @@ class Game:
         # test = self.cursor.fetchall()
         # self.conn.commit()
         if os.environ['DATABASE_URL'].__contains__("localhost"):  # todo these should be moved to a test suite
-            self.new_character(300, {'userName': 'epthed_test', 'characterName': 'epthed'})
+            self.new_character(300, {'userName': 'epthed_test', 'characterName': 'epthed'})  # create some characters
             self.new_character(30000, {'userName': 'epthed_test2', 'characterName': 'epthed2'})
             # (_, mapManager) = self.world.get_component(gs_map.MapManager)[0]
             # mapManager._testmap()
@@ -70,9 +70,9 @@ class Game:
                                   'admin': False})  # in prod I'll manually set admin users with db runs
             self.authenticate(3000, {'username': 'epthed_test', 'password': 'password'})
 
-        names = ['John', 'Bob', 'Jimbo', 'Brick']
-        for n in range(4):
-            self.world.create_entity(c.Position(x=n, y=0), c.Person(name=names[n]), c.UpdateFov())
+        names = ['John', 'Bob', 'Jimbo', 'Brick', 'jones', 'jebediah']
+        for n in range(6):  # create some NPCs
+            self.world.create_entity(c.Position(x=n, y=n), c.Person(name=names[n]), c.UpdateFov(), c.Renderable())
 
         while True:
             try:
@@ -82,8 +82,8 @@ class Game:
                 if end - start > .01:
                     print("main loop took", round((end - start) * 1000, 3), "ms")
                 # print("main thread tick")
-                await sio.sleep(
-                    .1)  # try to run at a 10 tickrate? Maybe? Gives the main thread 10 chances per second to do
+                await sio.sleep(.1)
+                # try to run at a 10 tickrate. Maybe? Gives the main thread 10 chances per second to do work
             except CancelledError:
                 print("received shutdown signal, exited main game_loop")
                 globalvar.conn.commit()
@@ -98,8 +98,8 @@ class Game:
 
     def new_character(self, sid, message):
         ent = self.world.create_entity(c.Character(sid=sid, username=message['userName']),
-                                       # c.Position(district=random.randint(0, 99)), c.Renderable(),
-                                       c.Position(district=55), c.Renderable(),
+                                       c.Position(district=random.randint(54, 56)), c.Renderable(),
+                                       # c.Position(district=55), c.Renderable(),
                                        c.Person(name=message['characterName']), c.UpdateFov())
         return ent
 

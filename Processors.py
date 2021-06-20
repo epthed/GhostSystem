@@ -19,8 +19,26 @@ class MovementProcessor(esper.Processor):
     # @njit('void(void)')
     def process(self):
         pass
-        # for ent, (vel, pos) in self.world.get_components(c.Velocity, c.Position):
-        # todo add set updateFoV after something moves
+        for ent, (pos) in self.world.get_components(c.Position):
+            # todo add set updateFoV after something moves
+            pos = pos[0]
+            desire_position = (pos.desire_z, pos.desire_y, pos.desire_x, pos.desire_district)
+            if desire_position == (pos.z, pos.y, pos.x, pos.district):
+                # don't wanna move, end movement processing.
+                continue
+            pass
+
+            # todo add movement checking
+            # todo add moving this entity to the requisite maps
+            if pos.desire_district != pos.district:
+                (_, districts) = self.world.get_component(c.ActiveDistricts)[0]
+                # self.world.add_component(_, c.UpdateMap())
+                self.world.add_component(ent, c.UpdateFov())
+
+            if pos.desire_district is None:
+                pos.desire_z, pos.desire_y, pos.desire_x, pos.desire_district = pos.z, pos.y, pos.x, pos.district
+            else:
+                pos.z, pos.y, pos.x, pos.district = desire_position
 
         #     # pos.x += vel.x
         #     # pos.y += vel.y
@@ -71,12 +89,23 @@ class MapProcessor(esper.Processor):
             (_, maps) = self.world.get_component(c.DistrictMaps)[0]
             # for _, (map_object) in self.world.get_component(gs_map.Map):
             #     self.world.delete_entity(_, immediate=True)  # todo redo deletion
-
-            mapManager.update_districts(districts.active_districts)
+            districts_in_use, feed_district_offsets = mapManager.update_districts(districts.active_districts)
             # for district in districts.active_districts:
             #     self.world.create_entity(gs_map.Map(mapManager.districts_active_maps[district], district=district))
+            entity_list = [[]] * 100
+            for ent, (pos) in self.world.get_components(c.Position):
+                # all entities that have a position, not all that necessarily are renderable
+                if type(pos) == list: pos = pos[0]
+                for enum, districts_to_update in enumerate(districts_in_use):
+                    for district in districts_to_update:
+                        if pos.district == enum:
+                            temp_list = entity_list[district].copy()
+                            temp_list.append((ent, pos.z, pos.y, pos.x, pos.district))
+                            entity_list[district] = temp_list
             for district in districts.active_districts:
-                maps.mapList[district] = gs_map.Map(mapManager.districts_active_maps[district], district=district)
+                maps.mapList[district] = gs_map.Map(mapManager.districts_active_maps[district], district=district,
+                                                    entities=entity_list[district],
+                                                    offsets=feed_district_offsets[district])
 
 
 class FovProcessor(esper.Processor):
@@ -92,12 +121,13 @@ class FovProcessor(esper.Processor):
             if maps.mapList[position.district] is None:
                 updated_fovs.append(ent)  # if the map isn't initialized yet, don't worry about it. will work next tick.
                 continue
-            person.fov = maps.mapList[position.district].calc_fov_map(position.z, position.y, position.x)
+            person.visible_entities = maps.mapList[position.district].calc_fov_ents(ent)
             # person.fov[0] = array of boolean grid visibility, [1] is horizontal walls, [2] is vertical walls
             if self.world.has_component(ent, c.Character):
                 character = self.world.component_for_entity(ent, c.Character)
                 # todo get render information here
-
+                person.fov = maps.mapList[position.district].calc_fov_map(position.z, position.y, position.x,
+                                                                          position.district)
                 asyncio.create_task(self.sio.emit('map_update', to=character.sid,
                                                   data={'data': json.dumps(person.fov)}))
             updated_fovs.append(ent)

@@ -104,8 +104,9 @@ class MapManager:
         self.districts_grid = np.arange(100).reshape(10, -1)  # 20 megs when exported, 100x100 would fill up the prod
         # DB on it's own. also each district is 1.2mb in memory. the server has 512mb total.
         self.districts: Union[None, np.array] = [None] * 100  # main memory object of all the districts
-        self.districts_in_use = [0] * 100  # counter of districts in use for active actors
+        self.districts_in_use = [list()] * 100  # counter of districts in use for active actors
         self.districts_active_maps = [None] * 100
+        self.feed_district_offsets = [list()] * 100  # districts that feed an active district, with offset info
 
     def _testmap(self):  # debug/learning function
         # for idz, zSlice in enumerate(self._objectarray):  # z iteration, outside in
@@ -143,9 +144,10 @@ class MapManager:
     def update_districts(self, active_districts: List[int]):
         # function returns a district grid numpy 3d array for each player actor,
         # shared if they are in the same district.
-        self.districts_in_use = [0] * 100  # reset memory counter
-        size = 2  # guarantee at least this * 100m visibility. 1: 300x300, 2: 500x500, 3:700x700
-        # changed district width to 30m. 1:90x90, 2:150x150
+        self.districts_in_use = [list()] * 100  # reset memory counter
+        size = 1  # guarantee at least this * 100m visibility. 0: 100x100 1: 300x300, 2: 500x500, 3:700x700
+        # changed district width to 30m. 0: 30x30 1:90x90, 2:150x150, 3:240x240
+        MAP_WIDTH = 30
         finalized_maps = []
         for loc in active_districts:
             district_index = np.nonzero(self.districts_grid == loc)  # returns y,x pair
@@ -169,7 +171,16 @@ class MapManager:
             for y in get_y:
                 for x in get_x:
                     district: int = self.districts_grid[y][x]
-                    self.districts_in_use[district] += 1  # remember that this district is in use
+                    temp_list = self.districts_in_use[district].copy()
+                    temp_list.append(loc)
+                    self.districts_in_use[district] = temp_list
+
+                    original_y = district_index[0][0]
+                    original_x = district_index[1][0]
+                    temp_list = self.feed_district_offsets[loc].copy()
+                    temp_list.append((district, MAP_WIDTH * (y - min(get_y)), MAP_WIDTH * (x - min(get_x))))
+                    self.feed_district_offsets[loc] = temp_list
+                    # remember that this district is in use
                     if self.districts[district] is None:
                         self.districts[district] = get_district(int(district))
                         # we now know all the districts we want are loaded.
@@ -178,40 +189,62 @@ class MapManager:
                 districts = []
                 for x in sorted(get_x):
                     districts.append(self.load_district_from_yx(y, x))
+
                     # districts.append(np.zeros((2, 2, 2))+y+x)  # test correct shape
                 y_rows.append(np.concatenate(districts, axis=2))
             map_for_location = np.concatenate(y_rows, axis=1)
             self.districts_active_maps[loc] = map_for_location
         for district, usage in enumerate(self.districts_in_use):
-            if usage == 0 and self.districts[district] is not None:
+            if usage == [] and self.districts[district] is not None:
                 save_district(self.districts[district], district)
                 self.districts[district] = None
+        return self.districts_in_use, self.feed_district_offsets
 
 
 class Map:
     # each active district has one of these, contains their FoV and navmap. NPCs and players in the same
-    # spot calculate their FoV and nav as a sub of this playerMap
-    def __init__(self, _nparray: np.array, district: int):  #
+    # spot calculate their FoV and nav as a sub of this playerMap. Also store list of entities and locations
+    # todo pass in district information so I can do relative positioning
+    def __init__(self, _nparray: np.array, district: int, entities: list, offsets: list):  #
         # address by z,y,x 0,0,0 is bottom height, west, and north
         # https://stackoverflow.com/a/15311166
         # print("initializing a map for", district)
         self.map = _nparray
         self.district = district
-        # self.initialize_skgeom()
-        # self.fov = True  # use setter to force recalculation
         self.fov = None
+        self.offsets = offsets
+        self.entities = []
+        for entity in entities:
+            self.entities.append((entity[0], *self.apply_offsets(entity[1], entity[2], entity[3], entity[4])))
 
-    def calc_fov_map(self, z_in: int = 0, y_in: int = 0, x_in: int = 0):
+    def apply_offsets(self, z, y, x, district):
+        for offset in self.offsets:
+            if offset[0] == district:
+                y += offset[1]
+                x += offset[2]
+        return z, y, x
+
+    def calc_fov_map(self, z_in: int = 0, y_in: int = 0, x_in: int = 0, district_in: int = 0):
         if self.fov is None:
             self.fov = FieldOfView(self.map)
         # else:
         #     fov_object.update_map(self.map) # todo smart incrementalism
-        visible = self.fov.calc_fov(z_in, y_in, x_in)
-        return visible
+        visible_slabs = self.fov.calc_slab_fov(*self.apply_offsets(z_in, y_in, x_in, district_in))
+        return visible_slabs
+
+    def calc_fov_ents(self, ent: int):
+        if self.fov is None:
+            self.fov = FieldOfView(self.map)
+        # else:
+        #     fov_object.update_map(self.map) # todo smart incrementalism
+        visible_ents = self.fov.calc_ent_fov(self.entities, ent)
+        return visible_ents
 
 
 class FieldOfView:  # One of these per district. Persons ask this class what they can see
     # todo add function to return visible entities
+
+    # @njit()
     def __init__(self, _nparray: np.array):
         self.polygon = Polyhedron_3()
         unique_visibilities = List()
@@ -229,14 +262,15 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
         verticals = np.nonzero(vertical)
         flats = np.nonzero(flat)
 
-        translucent_id = [1]  # material IDs that are to be shown, but don't block LoS. gonna be a long list eventually
+        self.translucent_id = {1}  # slab material IDs that are to be shown, but don't block LoS.
+        # gonna be a long list/set eventually. Not for space-filling item like a desk, that will be an entity.
 
         for i in range(horizontals[0].shape[0]):
             z = int(horizontals[0][i])
             y = int(horizontals[1][i])
             x = int(horizontals[2][i])
             create_geom = True
-            if vertical[z, y, x] in translucent_id:
+            if vertical[z, y, x] in self.translucent_id:
                 create_geom = False
             self.potential_visible_slabs.append((z, y, x,
                                                  self.create_quad(Point_3(z, y, x),
@@ -249,7 +283,7 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
             y = int(verticals[1][i])
             x = int(verticals[2][i])
             create_geom = True
-            if vertical[z, y, x] in translucent_id:
+            if vertical[z, y, x] in self.translucent_id:
                 create_geom = False
             self.potential_visible_slabs.append((z, y, x,
                                                  self.create_quad(Point_3(z, y + 1, x),
@@ -262,7 +296,7 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
             y = int(flats[1][i])
             x = int(flats[2][i])
             create_geom = True
-            if z == 0 or flat[z, y, x] in translucent_id:
+            if z == 0 or flat[z, y, x] in self.translucent_id:
                 create_geom = False
             self.potential_visible_slabs.append((z, y, x,
                                                  self.create_quad(Point_3(z, y + 1, x),
@@ -285,21 +319,37 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
     def update_map(self, _nparray: np.array):  # todo make this a smarter incremental and not nuke-n-pave
         self.__init__(_nparray)
 
-    def calc_fov(self, z_in: int = 0, y_in: int = 0, x_in: int = 0):
+    # @njit() can't njit the stuff using ANY cgal functions
+    def calc_slab_fov(self, z_in: int = 0, y_in: int = 0, x_in: int = 0):
         viewpoint = Point_3(z_in + .5, y_in + .5, x_in + .5)
         # destination = Point_3(z_in + 1, y_in + 1, x_in + 1)
         visible_slabs = []
         # test_segment = Segment_3(viewpoint, destination)
         for z, y, x, center, slab_id, location in self.potential_visible_slabs:
             test_segment = Segment_3(viewpoint, center)
-            if z == 0 and location == 0:
-                if not self.aabb.do_intersect(test_segment):  # check if intersect any slabs for the ground
+            if (z == 0 and location == 0) or slab_id in self.translucent_id:
+                if not self.aabb.do_intersect(test_segment):  # check if intersect any slabs for the ground or glass
                     visible_slabs.append((z, y, x, int(slab_id), location))
             else:
                 if self.aabb.number_of_intersected_primitives(test_segment) < 2:
                     visible_slabs.append((z, y, x, int(slab_id), location))
         return visible_slabs
         pass
+
+    def calc_ent_fov(self, entities: list, ent: int):
+
+        visible_entities = []
+        for entity_source in entities:
+            if entity_source[0] != ent:
+                continue
+            viewpoint = Point_3(entity_source[1] + .5, entity_source[2] + .5, entity_source[3] + .5)
+            for entity_target in entities:
+                # 0 ent, 1 pos.z, 2 pos.y, 3 pos.x,
+                center = Point_3(entity_target[1] + .5, entity_target[2] + .5, entity_target[3] + .5)
+                test_segment = Segment_3(viewpoint, center)
+                if not self.aabb.do_intersect(test_segment):  # check if intersect any slabs
+                    visible_entities.append((entity_target))
+        return visible_entities
 
 
 @njit(parallel=True, cache=True)

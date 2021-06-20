@@ -14,6 +14,10 @@ class Position:
     y:int = 0
     x:int = 0
     district:int = 55
+    desire_z:int = None
+    desire_y:int = None
+    desire_x:int = None
+    desire_district:int = None
 #
 # class EntityMap:
 #     def __init__(self, district=55):
@@ -29,7 +33,7 @@ class Position:
 
 @dataclass
 class ActiveDistricts:
-    active_districts: List[int] = field(default_factory=list)
+    active_districts: List[int] = field(default_factory=list) # todo change to a tuple of
 
 class DistrictMaps:
     def __init__(self):
@@ -56,4 +60,5 @@ class Character:
 class Person:
     # sentient beings, probably differentiate from robots and ghosts later
    name: str
-   fov = None  #only the results of a FoV query. Map district holds the FieldOfView object
+   fov = None  #only the results of a FoV slabs query. Map district holds the FieldOfView object
+   visible_entities: List[int] = field(default_factory=list)

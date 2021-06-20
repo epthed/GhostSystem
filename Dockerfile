@@ -19,10 +19,10 @@ RUN wget \
     && conda env create -f environment.yml
 
 SHELL ["conda", "run", "-n", "ghostsystem", "/bin/bash", "-c"]
-RUN git clone https://github.com/cgal/cgal-swig-bindings \
-    && cd cgal-swig-bindings \
-    && conda run -n ghostsystem cmake -DCGAL_DIR=/usr/lib/CGAL \
-    && conda run -n ghostsystem make -j 8
+#RUN git clone https://github.com/cgal/cgal-swig-bindings \
+#    && cd cgal-swig-bindings \
+#    && conda run -n ghostsystem cmake -DCGAL_DIR=/usr/lib/CGAL \
+#    && conda run -n ghostsystem make -j 8
 # up until here is 2.3 or 5gb, thankfully unfrequently updated
 
 # actually copy the code over
