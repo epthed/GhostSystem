@@ -1,4 +1,4 @@
-Backend/API for ghostsystem.
+Backend/API for [ghostsystem](https://ghostsystem-web.herokuapp.com/).
 
 Install with miniconda: 
 ```
