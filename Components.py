@@ -39,6 +39,8 @@ class DistrictMaps:
     def __init__(self):
         self.mapList: List(Union(None, Map)) = [None] * 100
 
+# todo add list of entities that can see this entity to Position or Renderable
+
 class Renderable:
     pass
 

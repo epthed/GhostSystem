@@ -35,6 +35,9 @@ class MovementProcessor(esper.Processor):
                 # self.world.add_component(_, c.UpdateMap())
                 self.world.add_component(ent, c.UpdateFov())
 
+            # todo add new flag here to all currently visibile entities of this entity,
+            #  that they need to update their entity fov: person.visible_entities
+            # todo somehow register the entities that can see this one
             if pos.desire_district is None:
                 pos.desire_z, pos.desire_y, pos.desire_x, pos.desire_district = pos.z, pos.y, pos.x, pos.district
             else:
@@ -121,6 +124,8 @@ class FovProcessor(esper.Processor):
             if maps.mapList[position.district] is None:
                 updated_fovs.append(ent)  # if the map isn't initialized yet, don't worry about it. will work next tick.
                 continue
+
+            # todo somehow register the entities that can see this one
             person.visible_entities = maps.mapList[position.district].calc_fov_ents(ent)
             # person.fov[0] = array of boolean grid visibility, [1] is horizontal walls, [2] is vertical walls
             if self.world.has_component(ent, c.Character):
