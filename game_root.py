@@ -5,7 +5,8 @@ import numpy as np
 import random
 import os
 import psycopg2
-import hashlib
+# import hashlib
+from argon2 import PasswordHasher, exceptions
 import time
 from asyncio import CancelledError
 
@@ -23,12 +24,12 @@ class Game:
         self.world = esper.World()
         self.stopping = False
         # self.map = gs_map.MapManager()
-        globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS test (id serial PRIMARY KEY, num integer, data varchar);")
+        # globalvar.cursor.execute(
+        # "CREATE TABLE IF NOT EXISTS test (id serial PRIMARY KEY, num integer, data varchar);")
         globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS users (id serial PRIMARY KEY,"
                                  "username varchar UNIQUE,"
-                                 "password bytea,"
-                                 "email bytea,"
-                                 "salt bytea,"
+                                 "password varchar,"
+                                 "email varchar,"
                                  "is_admin bool"
                                  ");")
         globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS mapdata (id serial PRIMARY KEY,"
@@ -67,8 +68,8 @@ class Game:
             # mapManager._testmap()
 
             self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com',
-                                  'admin': False})  # in prod I'll manually set admin users with db runs
-            self.authenticate(3000, {'username': 'epthed_test', 'password': 'password'})
+                                  'admin': False})  # in prod I'll manually set admin users with db commands
+            self.authenticate(3000, {'username': 'epthed_test', 'password': 'badpassword'})
 
         names = ['John', 'Bob', 'Jimbo', 'Brick', 'jones', 'jebediah']
         for n in range(6):  # create some NPCs
@@ -107,15 +108,13 @@ class Game:
         self.stopping = True
 
     def register(self, sid, message):
-        salt = os.urandom(16)
-        hashed_pw = hashlib.pbkdf2_hmac('sha512', password=message['password'].encode('utf-8'),
-                                        salt=salt, iterations=1000)
-        hashed_email = hashlib.pbkdf2_hmac('sha512', password=message['email'].encode('utf-8'),
-                                           salt=salt, iterations=1000)
+        ph = PasswordHasher(memory_cost=1000, parallelism=16)
+        hashed_pw = ph.hash(message['password'].encode('utf-8'))
+        hashed_email = ph.hash(message['email'].encode('utf-8'))
         try:
-            globalvar.cursor.execute("INSERT INTO users (username, password, email, salt, is_admin) "
-                                     "VALUES (%s,%s,%s,%s,%s)", (message['username'], hashed_pw, hashed_email, salt,
-                                                                 False))
+            globalvar.cursor.execute("INSERT INTO users (username, password, email, is_admin) "
+                                     "VALUES (%s,%s,%s,%s)", (message['username'], hashed_pw, hashed_email,
+                                                              False))
         except psycopg2.errors.UniqueViolation:
             globalvar.conn.rollback()
             return False
@@ -123,4 +122,20 @@ class Game:
         return True
 
     def authenticate(self, sid, message):
-        return True
+        ph = PasswordHasher(memory_cost=1000, parallelism=16)
+        username = message['username']
+        provided_pw = message['password']
+        try:
+            globalvar.cursor.execute("SELECT * FROM users WHERE username=%s", (username,))
+            user_object = globalvar.cursor.fetchone()
+            if user_object is None: raise TypeError
+        except TypeError:
+            globalvar.conn.rollback()
+            return False  # user doesn't exist
+        stored_pw = user_object[2]
+        try:
+            if ph.verify(stored_pw, provided_pw):
+                self.world.create_entity(c.Character(sid=sid, username=username))
+                return True  # success
+        except exceptions.VerifyMismatchError:
+            return False  # password fail

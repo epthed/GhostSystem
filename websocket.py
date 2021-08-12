@@ -9,9 +9,13 @@ from time import sleep
 from game_root import Game
 
 # mgr = socketio.AsyncRedisManager('redis://')
+cookie = {'name': "SESSID", "SameSite": "None", "Secure": True, }
 sio = socketio.asyncio_server.AsyncServer(async_mode='sanic', cors_allowed_origins=os.environ.get('ORIGINS'),
                                           logger=True,
-                                          engineio_logger=True)  # ,client_manager=mgr)
+                                          engineio_logger=True,
+                                          cookie=cookie,  # works but not really?
+
+                                          )  # ,client_manager=mgr)
 print("Async server started, accepting connections from", os.environ.get('ORIGINS'), "on port", os.environ.get('PORT'))
 goFast = Sanic(name="GhostSystem Local")
 sio.attach(goFast)

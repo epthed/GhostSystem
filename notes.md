@@ -11,15 +11,17 @@ from ctypes import cdll | kernel = cdll.LoadLibrary("./cgal-swig-bindings/build-
     how to use the raw .so is unknown. it's in scratch_3
 
 #TODO
-authentication+account creation + argon2id
 persist connection/authorization - cookies?  
 python test suite coverage  
 per-actor pathing  
 my apartment test map
 
+clientside rendering of some kind
+
 #IN PROGRESS
 
-clientside rendering of some kind
+authentication+account creation + argon2id
+
 
 #DONE
 display transparent walls/floors that are still in LoS

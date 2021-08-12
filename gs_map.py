@@ -376,15 +376,21 @@ def visibility_geometry_from_nparray(unique_visibilities_id: List,
                 # fill, west, north, floor = unique_visibilities[tile_index]
                 if slab_id_fill != 0:
                     # any fills are overridden by explicit slabs
-                    if vertical[z, y, x] is np.int8(0): vertical[z, y, x] = slab_id_fill  # west
+                    if vertical[z, y, x] == 0:
+                        vertical[z, y, x] = slab_id_fill  # west
                     if x != _map.shape[2] - 1:
-                        if vertical[z, y, x + 1] is np.int8(0): vertical[z, y, x + 1] = slab_id_fill  # east
-                    if horizontal[z, y, x] is np.int8(0): horizontal[z, y, x] = slab_id_fill  # north
+                        if vertical[z, y, x + 1] == 0:
+                            vertical[z, y, x + 1] = slab_id_fill  # east
+                    if horizontal[z, y, x] == 0:
+                        horizontal[z, y, x] = slab_id_fill  # north
                     if y != _map.shape[1] - 1:
-                        if horizontal[z, y + 1, x] is np.int8(0): horizontal[z, y + 1, x] = slab_id_fill  # south
-                    if flat[z, y, x] is np.int8(0): flat[z, y, x] = slab_id_fill  # floor
+                        if horizontal[z, y + 1, x] == 0:
+                            horizontal[z, y + 1, x] = slab_id_fill  # south
+                    if flat[z, y, x] == 0:
+                        flat[z, y, x] = slab_id_fill  # floor
                     if z != _map.shape[0] - 1:
-                        if flat[z + 1, y, x] is np.int8(0): flat[z + 1, y, x] = slab_id_fill  # ceiling
+                        if flat[z + 1, y, x] == 0:
+                            flat[z + 1, y, x] = slab_id_fill  # ceiling
 
                 if slab_id_west != 0 and x != 0:
                     vertical[z, y, x] = slab_id_west  # west
