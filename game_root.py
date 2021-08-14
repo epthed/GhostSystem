@@ -63,6 +63,8 @@ class Game:
         #
         # test = self.cursor.fetchall()
         # self.conn.commit()
+        self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com',
+                              'admin': False})
         if os.environ['DATABASE_URL'].__contains__("localhost"):  # todo these should be moved to a test suite
             self.new_character(300, {'userName': 'epthed_test', 'characterName': 'epthed'})  # create some characters
             self.new_character(30000, {'userName': 'epthed_test2', 'characterName': 'epthed2'})
