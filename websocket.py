@@ -98,7 +98,7 @@ async def disconnect_request(sid: str):
 @sio.event
 async def connect(sid: str, environ):
     print("Client", sid, "connected")
-    await sio.emit('my_response', {'data': 'Connected', 'count': 0}, room=sid)
+    # await sio.emit('ask_for_session', {}, room=sid)
 
 
 @sio.event
@@ -118,7 +118,8 @@ async def new_character(sid: str, message: dict):
 async def register(sid: str, message: dict):
     success = game.register(sid, message)
     if success:
-        await sio.emit('register', {'message': "User " + message + " was created", 'success': success}, room=sid)
+        await sio.emit('register', {'message': "User " + message['username'] + " was created", 'success': True,
+                                    'auth_token': success[0], 'username': success[1]}, room=sid)
     else:
         await sio.emit('register', {'message': "Registration Failed", 'success': success}, room=sid)
 
@@ -127,7 +128,7 @@ async def register(sid: str, message: dict):
 async def authenticate(sid: str, message: dict):
     success = game.authenticate(sid, message)
     if success:
-        await sio.emit('authenticate', {'message': "Welcome back " + message.username + ".", 'success': success},
-                       room=sid)
+        await sio.emit('authenticate', {'message': "Welcome back " + message['username'], 'success': True,
+                                        'auth_token': success[0], 'username': success[1]}, room=sid)
     else:
         await sio.emit('authenticate', {'message': "Authentication Failed", 'success': success}, room=sid)

@@ -8,6 +8,7 @@ import psycopg2
 # import hashlib
 from argon2 import PasswordHasher, exceptions
 import time
+import string
 from asyncio import CancelledError
 
 import Components as c
@@ -30,7 +31,8 @@ class Game:
                                  "username varchar UNIQUE,"
                                  "password varchar,"
                                  "email varchar,"
-                                 "is_admin bool"
+                                 "is_admin bool,"
+                                 "auth_token varchar"
                                  ");")
         globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS mapdata (id serial PRIMARY KEY,"
                                  "map json"  # stores json blob/string, will be a 3d numpy array
@@ -111,20 +113,30 @@ class Game:
         ph = PasswordHasher(memory_cost=1000, parallelism=16)
         hashed_pw = ph.hash(message['password'].encode('utf-8'))
         hashed_email = ph.hash(message['email'].encode('utf-8'))
+        rnd_lst = random.choices(string.ascii_letters, k=40)
+        auth_token = "".join(rnd_lst)
         try:
-            globalvar.cursor.execute("INSERT INTO users (username, password, email, is_admin) "
-                                     "VALUES (%s,%s,%s,%s)", (message['username'], hashed_pw, hashed_email,
-                                                              False))
+            globalvar.cursor.execute("INSERT INTO users (username, password, email, is_admin, auth_token) "
+                                     "VALUES (%s,%s,%s,%s, %s)", (message['username'], hashed_pw, hashed_email,
+                                                                  False, auth_token))
         except psycopg2.errors.UniqueViolation:
             globalvar.conn.rollback()
             return False
         globalvar.conn.commit()
-        return True
+        return auth_token, message['username']
 
     def authenticate(self, sid, message):
         ph = PasswordHasher(memory_cost=1000, parallelism=16)
         username = message['username']
-        provided_pw = message['password']
+        if 'password' in message:
+            provided_pw = message['password']
+        else:
+            provided_pw = None
+        if 'auth_token' in message:
+            auth_token = message['auth_token']
+        else:
+            rnd_lst = random.choices(string.ascii_letters, k=40)
+            auth_token = "".join(rnd_lst)
         try:
             globalvar.cursor.execute("SELECT * FROM users WHERE username=%s", (username,))
             user_object = globalvar.cursor.fetchone()
@@ -133,9 +145,19 @@ class Game:
             globalvar.conn.rollback()
             return False  # user doesn't exist
         stored_pw = user_object[2]
-        try:
-            if ph.verify(stored_pw, provided_pw):
-                self.world.create_entity(c.Character(sid=sid, username=username))
-                return True  # success
-        except exceptions.VerifyMismatchError:
-            return False  # password fail
+        stored_auth_token = user_object[5]
+        if provided_pw:
+            try:
+                if ph.verify(stored_pw, provided_pw):
+                    globalvar.cursor.execute("UPDATE users SET auth_token = %s WHERE username=%s",
+                                             (auth_token, username,))
+                    globalvar.conn.commit()
+                    self.world.create_entity(c.Character(sid=sid, username=username))
+                    return auth_token, username  # success
+            except exceptions.VerifyMismatchError:
+                return False  # password fail
+        else:  # validate based on provided auth token
+            if stored_auth_token == auth_token:
+                return auth_token, username
+            else:
+                return False
