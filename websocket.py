@@ -103,6 +103,7 @@ async def connect(sid: str, environ):
 
 @sio.event
 def disconnect(sid: str):
+    game.client_disconnect(sid)
     print('Client disconnected', sid)
 
 
@@ -110,7 +111,7 @@ def disconnect(sid: str):
 async def new_character(sid: str, message: dict):
     ent = game.new_character(sid, message)
     await sio.emit('new_character',
-                   {'message': "Character " + message['characterName'] + " was created for user " + message['userName'],
+                   {'message': "Character " + message['characterName'] + " was created for user " + message['username'],
                     'characterName': message['characterName'], 'entity': ent}, room=sid)
 
 

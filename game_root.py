@@ -1,21 +1,19 @@
-import esper
-from time import sleep
-import socketio
-import numpy as np
-import random
+import json
 import os
+import random
+import string
+import time
+from asyncio import CancelledError
+
+import esper
 import psycopg2
 # import hashlib
 from argon2 import PasswordHasher, exceptions
-import time
-import string
-from asyncio import CancelledError
 
 import Components as c
 import Processors
-import websocket
-import gs_map
 import globalvar
+import gs_map
 
 
 class Game:
@@ -63,11 +61,12 @@ class Game:
         #
         # test = self.cursor.fetchall()
         # self.conn.commit()
-        self.register(30000, {'username': 'epthed_test', 'password': 'password', 'email': 'epthedemail@gmail.com',
-                              'admin': False})
+        self.register(30000,
+                      {'username': 'epthed_test', 'password': 'passwordpassword', 'email': 'epthedemail@gmail.com',
+                       'admin': False})
         if os.environ['DATABASE_URL'].__contains__("localhost"):  # todo these should be moved to a test suite
-            self.new_character(300, {'userName': 'epthed_test', 'characterName': 'epthed'})  # create some characters
-            self.new_character(30000, {'userName': 'epthed_test2', 'characterName': 'epthed2'})
+            self.new_character(0, {'username': 'epthed_test', 'characterName': 'epthed'})  # create some characters
+            self.new_character(0, {'username': 'epthed_test2', 'characterName': 'epthed2'})
             # (_, mapManager) = self.world.get_component(gs_map.MapManager)[0]
             # mapManager._testmap()
 
@@ -102,11 +101,50 @@ class Game:
         # os._exit(0)  # exits the entire program without throwing error, but doesn't cleanup web connections.
 
     def new_character(self, sid, message):
-        ent = self.world.create_entity(c.Character(sid=sid, username=message['userName']),
-                                       c.Position(district=random.randint(54, 56)), c.Renderable(),
-                                       # c.Position(district=55), c.Renderable(),
-                                       c.Person(name=message['characterName']), c.UpdateFov())
+        npc = False
+        if sid == 0:  # this is an npc or internal creation
+            npc = True
+            message['username'] = ''
+        connected_player_outer = None
+        for ent, (connected_player) in self.world.get_component(c.ConnectedPlayer):
+            if connected_player.sid == sid:
+                connected_player.charName = message['characterName']
+                connected_player_outer = connected_player
+                break  # we now have the player who requested this creation
+        try:
+            globalvar.cursor.execute("INSERT INTO characters (username, charname, char_data) "
+                                     "VALUES (%s,%s,%s)",
+                                     (message['username'], message['characterName'], json.dumps({})))
+        except psycopg2.errors.UniqueViolation:
+            globalvar.conn.rollback()
+            return False
+        ent = self.world.create_entity(c.Position(district=random.randint(54, 56)), c.Renderable(),
+                                       c.Person(name=message['characterName'], is_player_controlled=not npc),
+                                       c.UpdateFov())
+
+        if not npc: connected_player_outer.character_entity = ent
+        self.save_character(ent)
         return ent
+
+    def save_character(self, ent):
+        person = self.world.component_for_entity(ent, c.Person)
+        person.fov = None  # null out big stuff we don't want to store persistently
+        character_data = list(self.world.components_for_entity(ent))
+        for i, obj in enumerate(character_data):
+            obj_str = json.dumps(obj.__dict__)  # todo use pickle instead of being dumb
+            character_data[i] = type(obj).__name__ + ":" + obj_str
+        character_data = json.dumps(character_data)
+        globalvar.cursor.execute("UPDATE characters SET char_data = %s WHERE charname=%s",
+                                 (character_data, person.name,))
+        globalvar.conn.commit()
+
+    def client_disconnect(self, sid):
+        for ent, (connected_player) in self.world.get_component(c.ConnectedPlayer):
+            if connected_player.sid == sid:
+                self.save_character(connected_player.character_entity)
+                self.world.delete_entity(connected_player.character_entity)
+                self.world.delete_entity(ent)
+                break
 
     def stop(self):
         self.stopping = True
@@ -154,12 +192,13 @@ class Game:
                     globalvar.cursor.execute("UPDATE users SET auth_token = %s WHERE username=%s",
                                              (auth_token, username,))
                     globalvar.conn.commit()
-                    self.world.create_entity(c.Character(sid=sid, username=username))
+                    self.world.create_entity(c.ConnectedPlayer(sid=sid, username=username))
                     return auth_token, username  # success
             except exceptions.VerifyMismatchError:
                 return False  # password fail
         else:  # validate based on provided auth token
             if stored_auth_token == auth_token:
+                self.world.create_entity(c.ConnectedPlayer(sid=sid, username=username))
                 return auth_token, username
             else:
                 return False

@@ -11,7 +11,7 @@ from ctypes import cdll | kernel = cdll.LoadLibrary("./cgal-swig-bindings/build-
     how to use the raw .so is unknown. it's in scratch_3
 
 #TODO
-persist connection/authorization - cookies?  
+
 python test suite coverage  
 per-actor pathing  
 my apartment test map
@@ -19,11 +19,14 @@ my apartment test map
 clientside rendering of some kind
 
 #IN PROGRESS
-
-authentication+account creation + argon2id
+character ownership/persistence/database
+    character save done
+    entity correlating to logged-in persons done
 
 
 #DONE
+persist connection/authorization - cookies?  
+authentication+account creation + argon2id
 display transparent walls/floors that are still in LoS
 graceful shutdown
 figure out global vs per-actor position addressing  

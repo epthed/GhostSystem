@@ -40,22 +40,27 @@ class DistrictMaps:
         self.mapList: List(Union(None, Map)) = [None] * 100
 
 # todo add list of entities that can see this entity to Position or Renderable
-
+@dataclass
 class Renderable:
     pass
+#     Renderable: bool = True
 
 class UpdateMap:
     pass
 
+@dataclass
 class UpdateFov:
     pass
+#     UpdateFov: bool = True
 
 
 @dataclass
-class Character:
-    # stuff that only counts for player characters
+class ConnectedPlayer:
+    # stuff that only counts for player characters will be separated from
     sid: str
     username: str
+    charName: str = ""
+    character_entity: int = 0
 
 
 @dataclass
@@ -64,3 +69,4 @@ class Person:
    name: str
    fov = None  #only the results of a FoV slabs query. Map district holds the FieldOfView object
    visible_entities: List[int] = field(default_factory=list)
+   is_player_controlled: bool = False
