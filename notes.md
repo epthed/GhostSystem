@@ -22,6 +22,7 @@ clientside rendering of some kind
 character ownership/persistence/database
     character save done
     entity correlating to logged-in persons done
+    
 
 
 #DONE

@@ -56,7 +56,7 @@ class UpdateFov:
 
 @dataclass
 class ConnectedPlayer:
-    # stuff that only counts for player characters will be separated from
+    # stuff that only counts for players, will be separated from the character entity
     sid: str
     username: str
     charName: str = ""

@@ -8,6 +8,7 @@ import json
 
 import Components as c
 import gs_map
+import globalvar
 
 
 # only implement processors for stuff that runs or needs to check every turn.
@@ -63,6 +64,35 @@ def _jitmovementprocessor(velx, vely, posx, posy):
     posx += velx
     posy += vely
     return posx, posy
+
+
+class LoginProcessor(esper.Processor):
+    def __init__(self, game, sio):
+        self.sio = sio
+        self.game = game
+
+    # gets characters for people logged in
+
+    def process(self):
+        for ent, (connected_player) in self.world.get_component(c.ConnectedPlayer):
+            if connected_player.character_entity == 0:
+                try:
+                    globalvar.cursor.execute("SELECT charname FROM characters WHERE username=%s",
+                                             (connected_player.username,))
+                    char_object = globalvar.cursor.fetchone()  # get existing character for this user.
+                    if char_object is None: raise TypeError
+                except TypeError:
+                    globalvar.conn.rollback()
+                if char_object is None: continue  # leave in a new character ready state
+                character = self.game.load_character(char_object[0])
+                if character:
+                    connected_player.charName = char_object[0]
+                    connected_player.character_entity = character
+                    asyncio.create_task(self.sio.emit('existing_character', to=connected_player.sid,
+                                                      data={'characterName': connected_player.charName,
+                                                            'message': "Character " + connected_player.charName +
+                                                                       " was loaded for user " + connected_player.username,
+                                                            'entity': connected_player.character_entity}))
 
 
 class DistrictProcessor(esper.Processor):
@@ -129,11 +159,11 @@ class FovProcessor(esper.Processor):
             person.visible_entities = maps.mapList[position.district].calc_fov_ents(ent)
             # person.fov[0] = array of boolean grid visibility, [1] is horizontal walls, [2] is vertical walls
             if self.world.has_component(ent, c.ConnectedPlayer):
-                character = self.world.component_for_entity(ent, c.ConnectedPlayer)
+                player = self.world.component_for_entity(ent, c.ConnectedPlayer)
                 # todo get render information here
                 person.fov = maps.mapList[position.district].calc_fov_map(position.z, position.y, position.x,
                                                                           position.district)
-                asyncio.create_task(self.sio.emit('map_update', to=character.sid,
+                asyncio.create_task(self.sio.emit('map_update', to=player.sid,
                                                   data={'data': json.dumps(person.fov)}))
             updated_fovs.append(ent)
         for _ in updated_fovs:

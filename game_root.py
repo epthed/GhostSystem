@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 import random
 import string
 import time
@@ -38,7 +39,7 @@ class Game:
         globalvar.cursor.execute("CREATE TABLE IF NOT EXISTS characters (id serial PRIMARY KEY,"
                                  "username varchar,"  # this username can run this character
                                  "charname varchar UNIQUE,"
-                                 "char_data json"  # stores json blob/string, will be lots of stuff
+                                 "char_data bytea"  # stores json blob/string, will be lots of stuff
                                  ");")
         globalvar.conn.commit()
 
@@ -51,6 +52,7 @@ class Game:
         self.world.add_processor(Processors.MovementProcessor())
         self.world.add_processor(Processors.DistrictProcessor())
         self.world.add_processor(Processors.MapProcessor())
+        self.world.add_processor(Processors.LoginProcessor(game=self, sio=sio))
         self.world.add_processor(Processors.FovProcessor(sio=sio))
 
         # make the map handler
@@ -129,14 +131,22 @@ class Game:
     def save_character(self, ent):
         person = self.world.component_for_entity(ent, c.Person)
         person.fov = None  # null out big stuff we don't want to store persistently
-        character_data = list(self.world.components_for_entity(ent))
-        for i, obj in enumerate(character_data):
-            obj_str = json.dumps(obj.__dict__)  # todo use pickle instead of being dumb
-            character_data[i] = type(obj).__name__ + ":" + obj_str
-        character_data = json.dumps(character_data)
+        character_data = pickle.dumps(self.world.components_for_entity(ent))
         globalvar.cursor.execute("UPDATE characters SET char_data = %s WHERE charname=%s",
                                  (character_data, person.name,))
         globalvar.conn.commit()
+
+    def load_character(self, charname):
+        try:
+            globalvar.cursor.execute("SELECT char_data FROM characters WHERE charname=%s", (charname,))
+            char_object = globalvar.cursor.fetchone()
+            if char_object is None: raise TypeError
+        except TypeError:
+            globalvar.conn.rollback()
+            return False  # character does not exist
+        char_data = char_object[0]
+        ent = self.world.create_entity(*pickle.loads(char_data))
+        return ent
 
     def client_disconnect(self, sid):
         for ent, (connected_player) in self.world.get_component(c.ConnectedPlayer):
