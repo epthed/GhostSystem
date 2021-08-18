@@ -1,4 +1,4 @@
-from sanic import Sanic
+from sanic import Sanic, exceptions
 from sanic.response import redirect
 from threading import Thread
 import asyncio
@@ -11,9 +11,9 @@ from game_root import Game
 # mgr = socketio.AsyncRedisManager('redis://')
 cookie = {'name': "SESSID", "SameSite": "None", "Secure": True, }
 sio = socketio.asyncio_server.AsyncServer(async_mode='sanic', cors_allowed_origins=os.environ.get('ORIGINS'),
-                                          logger=True,
-                                          engineio_logger=True,
-                                          cookie=cookie,  # works but not really?
+                                          logger=False,
+                                          engineio_logger=False,
+                                          # cookie=cookie,  # works but not really?
 
                                           )  # ,client_manager=mgr)
 print("Async server started, accepting connections from", os.environ.get('ORIGINS'), "on port", os.environ.get('PORT'))
@@ -92,7 +92,10 @@ async def my_room_event(sid: str, message: dict):
 
 @sio.event
 async def disconnect_request(sid: str):
-    await sio.disconnect(sid)
+    try:
+        await sio.disconnect(sid)
+    except exceptions.ServerError:
+        pass
 
 
 @sio.event

@@ -16,16 +16,17 @@ python test suite coverage
 per-actor pathing  
 my apartment test map
 
-clientside rendering of some kind
 
 #IN PROGRESS
-character ownership/persistence/database
-    character save done
-    entity correlating to logged-in persons done
+
     
+clientside rendering of some kind
 
 
 #DONE
+character ownership/persistence/database
+    character save done
+    entity correlating to logged-in persons done
 persist connection/authorization - cookies?  
 authentication+account creation + argon2id
 display transparent walls/floors that are still in LoS

@@ -222,7 +222,7 @@ class Map:
             if offset[0] == district:
                 y += offset[1]
                 x += offset[2]
-        return z, y, x
+        return z, int(y), int(x)
 
     def calc_fov_map(self, z_in: int = 0, y_in: int = 0, x_in: int = 0, district_in: int = 0):
         if self.fov is None:

@@ -102,8 +102,9 @@ class DistrictProcessor(esper.Processor):
         current_districts = list(set(districts.active_districts))
         # print(current_districts)
         # districts.active_districts
-        for ent, (character, position) in self.world.get_components(c.ConnectedPlayer, c.Position):
-            districts.active_districts.append(position.district)
+        for ent, (person, position) in self.world.get_components(c.Person, c.Position):
+            if person.is_player_controlled:
+                districts.active_districts.append(position.district)
         districts.active_districts = list(set(districts.active_districts))
         if (districts.active_districts != current_districts) and (len(districts.active_districts) > 0):
             self.world.add_component(_, c.UpdateMap())  # todo right now it updates all of them
@@ -158,13 +159,21 @@ class FovProcessor(esper.Processor):
             # todo somehow register the entities that can see this one
             person.visible_entities = maps.mapList[position.district].calc_fov_ents(ent)
             # person.fov[0] = array of boolean grid visibility, [1] is horizontal walls, [2] is vertical walls
-            if self.world.has_component(ent, c.ConnectedPlayer):
-                player = self.world.component_for_entity(ent, c.ConnectedPlayer)
-                # todo get render information here
-                person.fov = maps.mapList[position.district].calc_fov_map(position.z, position.y, position.x,
-                                                                          position.district)
-                asyncio.create_task(self.sio.emit('map_update', to=player.sid,
-                                                  data={'data': json.dumps(person.fov)}))
+            if person.is_player_controlled:
+                found_player = False
+                for _, (connected_player) in self.world.get_component(c.ConnectedPlayer):
+                    if connected_player.character_entity == ent:
+                        found_player = True
+                        break
+                if found_player:
+                    # todo get render information here
+
+                    person.fov = maps.mapList[position.district].calc_fov_map(position.z, position.y, position.x,
+                                                                              position.district)
+                    asyncio.create_task(self.sio.emit('entity_update', to=connected_player.sid,
+                                                      data={'data': json.dumps(person.visible_entities)}))
+                    asyncio.create_task(self.sio.emit('map_update', to=connected_player.sid,
+                                                      data={'data': json.dumps(person.fov)}))
             updated_fovs.append(ent)
         for _ in updated_fovs:
             self.world.remove_component(_, c.UpdateFov)

@@ -43,7 +43,6 @@ class DistrictMaps:
 @dataclass
 class Renderable:
     pass
-#     Renderable: bool = True
 
 class UpdateMap:
     pass
@@ -51,7 +50,6 @@ class UpdateMap:
 @dataclass
 class UpdateFov:
     pass
-#     UpdateFov: bool = True
 
 
 @dataclass

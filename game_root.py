@@ -49,11 +49,11 @@ class Game:
         # always invoke component adds with () even if no constructor argument
         # self.world.add_component(player, c.Position(x=1, y=2))
 
-        self.world.add_processor(Processors.MovementProcessor())
-        self.world.add_processor(Processors.DistrictProcessor())
-        self.world.add_processor(Processors.MapProcessor())
+        self.world.add_processor(Processors.MovementProcessor(), priority=5)
+        self.world.add_processor(Processors.MapProcessor(), priority=4)
+        self.world.add_processor(Processors.DistrictProcessor(), priority=3)
         self.world.add_processor(Processors.LoginProcessor(game=self, sio=sio))
-        self.world.add_processor(Processors.FovProcessor(sio=sio))
+        self.world.add_processor(Processors.FovProcessor(sio=sio), priority=2)
 
         # make the map handler
         self.world.create_entity(c.ActiveDistricts())
@@ -76,9 +76,10 @@ class Game:
                                   'admin': False})  # in prod I'll manually set admin users with db commands
             self.authenticate(3000, {'username': 'epthed_test', 'password': 'badpassword'})
 
-        names = ['John', 'Bob', 'Jimbo', 'Brick', 'jones', 'jebediah']
-        for n in range(6):  # create some NPCs
-            self.world.create_entity(c.Position(x=n, y=n), c.Person(name=names[n]), c.UpdateFov(), c.Renderable())
+        # names = ['John', 'Bob', 'Jimbo', 'Brick', 'jones', 'jebediah']
+        for n in range(40, 69):  # create some NPCs
+            self.world.create_entity(c.Position(x=0, y=0, district=n), c.Person(name=str(n)), c.UpdateFov(),
+                                     c.Renderable())
 
         while True:
             try:
@@ -92,6 +93,8 @@ class Game:
                 # try to run at a 10 tickrate. Maybe? Gives the main thread 10 chances per second to do work
             except CancelledError:
                 print("received shutdown signal, exited main game_loop")
+                for ent, (connected_player) in self.world.get_component(c.ConnectedPlayer):
+                    self.client_disconnect(connected_player.sid)
                 globalvar.conn.commit()
                 globalvar.conn.close()
                 return
@@ -126,6 +129,7 @@ class Game:
 
         if not npc: connected_player_outer.character_entity = ent
         self.save_character(ent)
+        self.world.create_entity(c.UpdateMap())
         return ent
 
     def save_character(self, ent):
@@ -145,15 +149,17 @@ class Game:
             globalvar.conn.rollback()
             return False  # character does not exist
         char_data = char_object[0]
-        ent = self.world.create_entity(*pickle.loads(char_data))
+        ent = self.world.create_entity(*pickle.loads(char_data), c.UpdateFov())
+        self.world.create_entity(c.UpdateMap())  # also fire off an updatemap
         return ent
 
     def client_disconnect(self, sid):
         for ent, (connected_player) in self.world.get_component(c.ConnectedPlayer):
-            if connected_player.sid == sid:
+            if connected_player.sid == sid and connected_player.character_entity != 0:
                 self.save_character(connected_player.character_entity)
                 self.world.delete_entity(connected_player.character_entity)
                 self.world.delete_entity(ent)
+                self.world.create_entity(c.UpdateMap())
                 break
 
     def stop(self):
