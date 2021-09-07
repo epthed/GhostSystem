@@ -332,6 +332,7 @@ class FieldOfView:  # One of these per district. Persons ask this class what the
                     visible_slabs.append((z, y, x, int(slab_id), location))
             else:
                 if self.aabb.number_of_intersected_primitives(test_segment) < 2:
+                    # check if it intersects itself and another for all other cases
                     visible_slabs.append((z, y, x, int(slab_id), location))
         return visible_slabs
         pass

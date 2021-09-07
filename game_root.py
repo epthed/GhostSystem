@@ -149,7 +149,8 @@ class Game:
             globalvar.conn.rollback()
             return False  # character does not exist
         char_data = char_object[0]
-        ent = self.world.create_entity(*pickle.loads(char_data), c.UpdateFov())
+        ent = self.world.create_entity(*pickle.loads(char_data))
+        self.world.add_component(ent, c.UpdateFov())
         self.world.create_entity(c.UpdateMap())  # also fire off an updatemap
         return ent
 

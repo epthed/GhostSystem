@@ -19,6 +19,29 @@ my apartment test map
 
 #IN PROGRESS
 
+FoV faster: Visibility From Point
+    Visible Surface Determination algo
+    Visibility culling
+    Visibility Map
+    Hard Shadows
+    ray-set tracing
+    point-based rendering
+    problem is discrete(limited rays) or continuous? probably D
+    solution is structured Discrete or Continuous. Discrete easier
+            is semantics: Object space or Image space. absolutely Object space
+            Accuracy: Exact Conservative or Approximate. Not sure, conservative probably easiest
+    DOC: woo&amanatides 1990 hard shadows 
+        wonka&schmalsteig 1999 too constrained to ground-intersections
+    DOA: none
+    DOE: Appel 1968
+         cohen-or&Shaked 1995
+         Lee&shin 1997
+         Whitted 1979
+         heidmann 1991
+    Open3d point cloud Hidden Surface Removal
+    Easy3d? 
+         
+    
     
 clientside rendering of some kind
 

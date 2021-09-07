@@ -92,7 +92,8 @@ class LoginProcessor(esper.Processor):
                                                       data={'characterName': connected_player.charName,
                                                             'message': "Character " + connected_player.charName +
                                                                        " was loaded for user " + connected_player.username,
-                                                            'entity': connected_player.character_entity}))
+                                                            'entity': connected_player.character_entity,
+                                                            'success': True, }))
 
 
 class DistrictProcessor(esper.Processor):
@@ -153,7 +154,7 @@ class FovProcessor(esper.Processor):
             position = self.world.component_for_entity(ent, c.Position)
             (_, maps) = self.world.get_component(c.DistrictMaps)[0]
             if maps.mapList[position.district] is None:
-                updated_fovs.append(ent)  # if the map isn't initialized yet, don't worry about it. will work next tick.
+                # updated_fovs.append(ent) if the map isn't initialized yet, don't worry about it. will work next tick.
                 continue
 
             # todo somehow register the entities that can see this one
@@ -170,7 +171,7 @@ class FovProcessor(esper.Processor):
 
                     person.fov = maps.mapList[position.district].calc_fov_map(position.z, position.y, position.x,
                                                                               position.district)
-                    asyncio.create_task(self.sio.emit('entity_update', to=connected_player.sid,
+                    asyncio.create_task(self.sio.emit('entities_update', to=connected_player.sid,
                                                       data={'data': json.dumps(person.visible_entities)}))
                     asyncio.create_task(self.sio.emit('map_update', to=connected_player.sid,
                                                       data={'data': json.dumps(person.fov)}))
